@@ -23,13 +23,9 @@ import inspect
 import logging
 import math
 import re
-from collections.abc import Mapping
 from importlib import import_module
 from types import ModuleType
 from typing import Any, Callable, Dict, List, Optional, Tuple
-
-import numpy as np
-import pandas as pd
 
 
 logger = logging.getLogger(__name__)
@@ -648,38 +644,7 @@ def evaluate_subscript(
 ) -> Any:
     index = evaluate_ast(subscript.slice, state, static_tools, custom_tools, authorized_imports)
     value = evaluate_ast(subscript.value, state, static_tools, custom_tools, authorized_imports)
-
-    if isinstance(value, str) and isinstance(index, str):
-        raise InterpreterError("You're trying to subscript a string with a string index, which is impossible")
-    if isinstance(value, pd.core.indexing._LocIndexer):
-        parent_object = value.obj
-        return parent_object.loc[index]
-    if isinstance(value, pd.core.indexing._iLocIndexer):
-        parent_object = value.obj
-        return parent_object.iloc[index]
-    if isinstance(value, (pd.DataFrame, pd.Series, np.ndarray)):
-        return value[index]
-    elif isinstance(value, pd.core.groupby.generic.DataFrameGroupBy):
-        return value[index]
-    elif isinstance(index, slice):
-        return value[index]
-    elif isinstance(value, (list, tuple)):
-        if not (-len(value) <= index < len(value)):
-            raise InterpreterError(f"Index {index} out of bounds for list of length {len(value)}")
-        return value[int(index)]
-    elif isinstance(value, str):
-        if not (-len(value) <= index < len(value)):
-            raise InterpreterError(f"Index {index} out of bounds for string of length {len(value)}")
-        return value[index]
-    elif index in value:
-        return value[index]
-    else:
-        error_message = f"Could not index {value} with '{index}'."
-        if isinstance(index, str) and isinstance(value, Mapping):
-            close_matches = difflib.get_close_matches(index, list(value.keys()))
-            if len(close_matches) > 0:
-                error_message += f" Maybe you meant one of these indexes instead: {str(close_matches)}"
-        raise InterpreterError(error_message)
+    return value[index]
 
 
 def evaluate_name(

@@ -14,11 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 # 🐍 pytherpreter 🐍
+
 A Python interpreter with built-in safeguards for executing untrusted code, like LLM-generated scripts.
 
-This repository extracts the Python interpreter tool from HuggingFace’s [smolagents](https://github.com/huggingface/smolagents) project.
+This repository contains the Python interpreter tool extracted from HuggingFace’s [_smolagents_](https://github.com/huggingface/smolagents) project.
+Big hug to the HuggingFace team for their initial implementation! 🤗
 
-One improvement over smolagents is that pytherpreter also supports async code execution using the `async_evaluate` function and `AsyncPythonInterpreter` class.
+Some improvements over smolagents:
+- Supports async code execution using the `async_evaluate` function and `AsyncPythonInterpreter` class.
+- Improved function call resolution.
+- Supports custom subscriptable objects.
+- No external dependencies.
 
 ## Installation
 ```shell

@@ -942,7 +942,7 @@ shift_intervals
         code = 'capitals = {"Czech Republic": "Prague", "Monaco": "Monaco", "Bhutan": "Thimphu"};capitals["Butan"]'
         with pytest.raises(Exception) as e:
             evaluate(code)
-        assert "Maybe you meant one of these indexes instead" in str(e) and "['Bhutan']" in str(e).replace("\\", "")
+        assert "KeyError: 'Butan'" in str(e).replace("\\", "")
 
     def test_dangerous_builtins_calls_are_blocked(self):
         unsafe_code = "import os"
@@ -1117,7 +1117,7 @@ def test_evaluate_augassign_custom(operator, expected_result):
                 del x[2]
                 x[2]
             """),
-            "Index 2 out of bounds for list of length 2",
+            "list index out of range",
         ),
         (
             dedent("""\
@@ -1125,7 +1125,7 @@ def test_evaluate_augassign_custom(operator, expected_result):
                 del x["key"]
                 x["key"]
             """),
-            "Could not index {} with 'key'",
+            "'key'",
         ),
         (
             dedent("""\
@@ -1417,3 +1417,15 @@ def test_function_returning_function():
     result, _ = evaluate(code, {}, {})
     assert result == 2
 
+def test_custom_subscriptable():
+    code = dedent("""\
+        class MyList:
+            def __init__(self, items):
+                self.items = items
+            def __getitem__(self, index):
+                return self.items[index]
+        my_list = MyList(["a", "b", "c"])
+        my_list[1]
+        """)
+    result, _ = evaluate(code, {}, {})
+    assert result == "b"
