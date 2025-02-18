@@ -397,7 +397,6 @@ async def evaluate_call(
     authorized_imports: List[str],
 ) -> Any:
     func = await evaluate_ast(call.func, state, static_tools, custom_tools, authorized_imports)
-    func_name = func.__name__
 
     args = []
     for arg in call.args:
@@ -411,6 +410,7 @@ async def evaluate_call(
         for keyword in call.keywords
     }
 
+    func_name = func.__name__ if hasattr(func, "__name__") else None
     if func_name == "super":
         if not args:
             if "__class__" in state and "self" in state:

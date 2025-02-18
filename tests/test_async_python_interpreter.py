@@ -1457,6 +1457,15 @@ async def test_custom_subscriptable():
     result, _ = await async_evaluate(code, {}, {})
     assert result == "b"
 
+
+@pytest.mark.asyncio
+async def test_not_callable_error():
+    code = dedent("'foo'()")
+    with pytest.raises(InterpreterError) as e:
+        await async_evaluate(code)
+    assert "'str' object is not callable" in str(e.value)
+
+
 @pytest.mark.asyncio
 async def test_await():
     code = dedent("""\

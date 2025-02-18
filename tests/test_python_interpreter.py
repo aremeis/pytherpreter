@@ -1429,3 +1429,10 @@ def test_custom_subscriptable():
         """)
     result, _ = evaluate(code, {}, {})
     assert result == "b"
+
+def test_not_callable_error():
+    code = dedent("'foo'()")
+    with pytest.raises(InterpreterError) as e:
+        evaluate(code)
+    assert "'str' object is not callable" in str(e.value)
+
