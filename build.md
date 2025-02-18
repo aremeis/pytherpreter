@@ -5,6 +5,11 @@ Install required dependencies
 pip install build twine
 ```
 
+Clean build artifacts
+```shell
+rm -rf build/ dist/ *.egg-info/ **/__pycache__/ **/*.py[cod]
+```
+
 Build package
 ```shell
 python -m build
