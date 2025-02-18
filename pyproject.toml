@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytherpreter"
+version = "0.0.1"
+authors = [
+    {name = "Are Meisfjord"},
+    {name = "The HuggingFace Inc. team"}
+]
+description = "A Python interpreter with built-in safeguards for executing untrusted code, like LLM-generated scripts."
+readme = "README.md"
+license = {text = "Apache 2.0"}
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26.0",
+    "pandas>=2.0.0",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/aremeis/pytherpreter"
+"Bug Tracker" = "https://github.com/aremeis/pytherpreter/issues"
+
+[tool.setuptools]
+packages = {find = {where = ["."], exclude = ["tests*"]}}
+zip-safe = true
+include-package-data = true
