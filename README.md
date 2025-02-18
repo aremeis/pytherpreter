@@ -25,6 +25,18 @@ One improvement over smolagents is that pytherpreter also supports async code ex
 pip install pytherpreter
 ```
 
+Latest development version:
+
+```shell
+pip install git+ssh://git@github.com/aremeis/pytherpreter.git
+```
+
+or
+
+```shell
+pip install git+https://github.com/aremeis/pytherpreter.git
+```
+
 ## Usage
 
 ### Using `evaluate`
