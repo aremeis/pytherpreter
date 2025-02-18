@@ -18,6 +18,8 @@ A Python interpreter with built-in safeguards for executing untrusted code, like
 
 This repository extracts the Python interpreter tool from HuggingFace’s [smolagents](https://github.com/huggingface/smolagents) project.
 
+One improvement over smolagents is that pytherpreter also supports async code execution using the `async_evaluate` function and `AsyncPythonInterpreter` class.
+
 ## Installation
 ```shell
 pip install pytherpreter
@@ -25,13 +27,13 @@ pip install pytherpreter
 
 ## Usage
 
-### `evaluate_python_code`
+### Using `evaluate`
 
-`evaluate_python_code` is a function that evaluates Python code and returns the result.
+This function evaluates Python code and returns the result.
 ```python
-from pytherpreter import evaluate_python_code
+from pytherpreter import evaluate
 
-result, final_answer = evaluate_python_code("""
+result, final_answer = evaluate("""
 from math import sqrt
 sqrt(4)
 """)
@@ -43,7 +45,7 @@ print(final_answer)
 # False
 ```
 
-By default, the `evaluate_python_code` function will return the result of the last expression in the code.
+By default, the `evaluate` function will return the result of the last expression in the code.
 However, you can also return a value from the code by using the `final_answer` function:
 
 ```python
@@ -56,6 +58,40 @@ print(final_answer)
 
 # Output:
 # 2.0
+# True
+```
+
+### Using `PythonInterpreter`
+
+This class is a wrapper around the `evaluate` function that keeps the state of the interpreter between calls.
+Variables and functions defined by the code will be be available in subsequent calls.
+
+```python
+from pytherpreter import PythonInterpreter
+
+interpreter = PythonInterpreter()
+result, logs, is_final_answer = interpreter("x = 3")
+print(result)
+print(logs)
+print(is_final_answer)
+
+# Output:
+# 3
+# 
+# False
+
+result, logs, is_final_answer = interpreter("""
+x += 1
+print('x =', x)
+final_answer(x);
+""")
+print(result)
+print(logs)
+print(is_final_answer)
+
+# Output:
+# 4
+# x = 4
 # True
 ```
 

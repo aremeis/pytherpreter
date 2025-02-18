@@ -31,10 +31,36 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from .utils import BASE_BUILTIN_MODULES, truncate_content
-
 
 logger = logging.getLogger(__name__)
+
+
+MAX_LENGTH_TRUNCATE_CONTENT = 20000
+
+def truncate_content(content: str, max_length: int = MAX_LENGTH_TRUNCATE_CONTENT) -> str:
+    if len(content) <= max_length:
+        return content
+    else:
+        return (
+            content[: max_length // 2]
+            + f"\n..._This content has been truncated to stay below {max_length} characters_...\n"
+            + content[-max_length // 2 :]
+        )
+
+
+BASE_BUILTIN_MODULES = [
+    "collections",
+    "datetime",
+    "itertools",
+    "math",
+    "queue",
+    "random",
+    "re",
+    "stat",
+    "statistics",
+    "time",
+    "unicodedata",
+]
 
 
 class InterpreterError(ValueError):
@@ -60,6 +86,7 @@ MAX_WHILE_ITERATIONS = 1000000
 def custom_print(*args):
     return None
 custom_print.__name__ = "print"
+
 
 BASE_PYTHON_TOOLS = {
     "print": custom_print,
@@ -1265,7 +1292,7 @@ class FinalAnswerException(Exception):
         self.value = value
 
 
-def evaluate_python_code(
+def evaluate(
     code: str,
     static_tools: Optional[Dict[str, Callable]] = None,
     custom_tools: Optional[Dict[str, Callable]] = None,
@@ -1276,8 +1303,6 @@ def evaluate_python_code(
     """
     Evaluate a python expression using the content of the variables stored in a state and only evaluating a given set
     of functions.
-
-    This function will recurse through the nodes of the tree provided.
 
     Args:
         code (`str`):
@@ -1338,7 +1363,7 @@ def evaluate_python_code(
         )
 
 
-class LocalPythonInterpreter:
+class PythonInterpreter:
     def __init__(
         self,
         additional_authorized_imports: List[str] = None,
@@ -1363,7 +1388,7 @@ class LocalPythonInterpreter:
 
     def __call__(self, code_action: str, additional_variables: Dict = {}) -> Tuple[Any, str, bool]:
         self.state.update(additional_variables)
-        output, is_final_answer = evaluate_python_code(
+        output, is_final_answer = evaluate(
             code_action,
             static_tools=self.static_tools,
             custom_tools=self.custom_tools,
@@ -1375,4 +1400,4 @@ class LocalPythonInterpreter:
         return output, logs, is_final_answer
 
 
-__all__ = ["evaluate_python_code", "LocalPythonInterpreter"]
+__all__ = ["evaluate", "PythonInterpreter", "BASE_PYTHON_TOOLS", "MAX_LENGTH_TRUNCATE_CONTENT", "DEFAULT_MAX_LEN_OUTPUT", "MAX_OPERATIONS", "MAX_WHILE_ITERATIONS"]

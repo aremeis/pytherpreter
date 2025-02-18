@@ -17,7 +17,8 @@
 # limitations under the License.
 
 from importlib.metadata import version
-from .local_python_executor import *
+from .python_interpreter import *
+from .async_python_interpreter import *
 
 try:
     __version__ = version("pytherpreter")
