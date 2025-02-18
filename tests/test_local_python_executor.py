@@ -1397,3 +1397,21 @@ def test_check_module_authorized(module: str, authorized_imports: list[str], exp
         "multiprocessing",
     )
     assert check_module_authorized(module, authorized_imports, dangerous_patterns) == expected
+
+
+def test__name__():
+    code = dedent("""\
+        def foo(): return 0
+        foo.__name__
+        """)
+    result, _ = evaluate_python_code(code, {}, {})
+    assert result == "foo"
+
+def test_function_returning_function():
+    code = dedent("""\
+        def f(): 
+            return lambda x: x + 1
+        f()(1)
+        """)
+    result, _ = evaluate_python_code(code, {}, {})
+    assert result == 2
