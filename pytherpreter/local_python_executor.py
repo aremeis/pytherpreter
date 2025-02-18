@@ -15,6 +15,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import ast
 import builtins
 import difflib
@@ -1340,10 +1341,12 @@ def evaluate_python_code(
 class LocalPythonInterpreter:
     def __init__(
         self,
-        additional_authorized_imports: List[str],
-        tools: Dict,
+        additional_authorized_imports: List[str] = None,
+        tools: Dict = None,
         max_print_outputs_length: Optional[int] = None,
     ):
+        additional_authorized_imports = additional_authorized_imports or []
+        tools = tools or {}
         self.custom_tools = {}
         self.state = {}
         self.max_print_outputs_length = max_print_outputs_length
@@ -1358,7 +1361,7 @@ class LocalPythonInterpreter:
         }
         # TODO: assert self.authorized imports are all installed locally
 
-    def __call__(self, code_action: str, additional_variables: Dict) -> Tuple[Any, str, bool]:
+    def __call__(self, code_action: str, additional_variables: Dict = {}) -> Tuple[Any, str, bool]:
         self.state.update(additional_variables)
         output, is_final_answer = evaluate_python_code(
             code_action,
