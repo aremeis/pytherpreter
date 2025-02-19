@@ -34,6 +34,7 @@ from .python_interpreter import (
     ContinueException,
     ReturnException,
     InterpreterError,
+    ClientError,
     evaluate_lambda, 
     evaluate_function_def,
     evaluate_name,
@@ -982,11 +983,6 @@ async def evaluate_ast(
         raise InterpreterError(f"{expression.__class__.__name__} is not supported.")
 
 
-class FinalAnswerException(Exception):
-    def __init__(self, value):
-        self.value = value
-
-
 async def async_evaluate(
     code: str,
     static_tools: Optional[Dict[str, Callable]] = None,
@@ -1043,19 +1039,12 @@ async def async_evaluate(
     custom_tools = custom_tools if custom_tools is not None else {}
     result = None
 
-    def final_answer(value):
-        raise FinalAnswerException(value)
-
-    static_tools["final_answer"] = final_answer
-
     try:
         for node in expression.body:
             result = await evaluate_ast(node, state, static_tools, custom_tools, authorized_imports)
-        is_final_answer = False
-        return result, is_final_answer
-    except FinalAnswerException as e:
-        is_final_answer = True
-        return e.value, is_final_answer
+        return result
+    except ClientError as e:
+        raise e
     except Exception as e:
         raise InterpreterError(
             f"Code execution failed at line '{ast.get_source_segment(code, node)}' due to: {type(e).__name__}: {e}"

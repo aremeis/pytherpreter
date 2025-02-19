@@ -55,6 +55,14 @@ class InterpreterError(ValueError):
     pass
 
 
+class ClientError(Exception):
+    """
+    This error (or any subclass) can be raised by client code. 
+    It will be passed through without being wrapped in an InterpreterError.
+    """
+    pass
+
+
 ERRORS = {
     name: getattr(builtins, name)
     for name in dir(builtins)
@@ -1200,11 +1208,6 @@ def evaluate_ast(
         raise InterpreterError(f"{expression.__class__.__name__} is not supported.")
 
 
-class FinalAnswerException(Exception):
-    def __init__(self, value):
-        self.value = value
-
-
 def evaluate(
     code: str,
     static_tools: Optional[Dict[str, Callable]] = None,
@@ -1260,19 +1263,12 @@ def evaluate(
     custom_tools = custom_tools if custom_tools is not None else {}
     result = None
 
-    def final_answer(value):
-        raise FinalAnswerException(value)
-
-    static_tools["final_answer"] = final_answer
-
     try:
         for node in expression.body:
             result = evaluate_ast(node, state, static_tools, custom_tools, authorized_imports)
-        is_final_answer = False
-        return result, is_final_answer
-    except FinalAnswerException as e:
-        is_final_answer = True
-        return e.value, is_final_answer
+        return result
+    except ClientError as e:
+        raise e
     except Exception as e:
         raise InterpreterError(
             f"Code execution failed at line '{ast.get_source_segment(code, node)}' due to: {type(e).__name__}: {e}"
@@ -1318,4 +1314,4 @@ class PythonInterpreter:
         return output, logs, is_final_answer
 
 
-__all__ = ["evaluate", "PythonInterpreter", "BASE_PYTHON_TOOLS", "DEFAULT_MAX_LEN_OUTPUT", "MAX_OPERATIONS", "MAX_WHILE_ITERATIONS"]
+__all__ = ["evaluate", "PythonInterpreter", "ClientError", "BASE_PYTHON_TOOLS", "MAX_OPERATIONS", "MAX_WHILE_ITERATIONS"]

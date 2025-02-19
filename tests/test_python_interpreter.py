@@ -51,19 +51,19 @@ class PythonInterpreterTester(unittest.TestCase):
     def test_evaluate_assign(self):
         code = "x = 3"
         state = {}
-        result, _ = evaluate(code, {}, state=state)
+        result = evaluate(code, {}, state=state)
         assert result == 3
         self.assertDictEqualNoPrint(state, {"x": 3, "_operations_count": 2})
 
         code = "x = y"
         state = {"y": 5}
-        result, _ = evaluate(code, {}, state=state)
+        result = evaluate(code, {}, state=state)
         # evaluate returns the value of the last assignment.
         assert result == 5
         self.assertDictEqualNoPrint(state, {"x": 5, "y": 5, "_operations_count": 2})
 
         code = "a=1;b=None"
-        result, _ = evaluate(code, {}, state={})
+        result = evaluate(code, {}, state={})
         # evaluate returns the value of the last assignment.
         assert result is None
 
@@ -76,7 +76,7 @@ class PythonInterpreterTester(unittest.TestCase):
     def test_subscript_call(self):
         code = """def foo(x,y):return x*y\n\ndef boo(y):\n\treturn y**3\nfun = [foo, boo]\nresult_foo = fun[0](4,2)\nresult_boo = fun[1](4)"""
         state = {}
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state=state)
+        result = evaluate(code, BASE_PYTHON_TOOLS, state=state)
         assert result == 64
         assert state["result_foo"] == 8
         assert state["result_boo"] == 64
@@ -84,7 +84,7 @@ class PythonInterpreterTester(unittest.TestCase):
     def test_evaluate_call(self):
         code = "y = add_two(x)"
         state = {"x": 3}
-        result, _ = evaluate(code, {"add_two": add_two}, state=state)
+        result = evaluate(code, {"add_two": add_two}, state=state)
         assert result == 5
         self.assertDictEqualNoPrint(state, {"x": 3, "y": 5, "_operations_count": 4})
 
@@ -96,21 +96,21 @@ class PythonInterpreterTester(unittest.TestCase):
     def test_evaluate_constant(self):
         code = "x = 3"
         state = {}
-        result, _ = evaluate(code, {}, state=state)
+        result = evaluate(code, {}, state=state)
         assert result == 3
         self.assertDictEqualNoPrint(state, {"x": 3, "_operations_count": 2})
 
     def test_evaluate_dict(self):
         code = "test_dict = {'x': x, 'y': add_two(x)}"
         state = {"x": 3}
-        result, _ = evaluate(code, {"add_two": add_two}, state=state)
+        result = evaluate(code, {"add_two": add_two}, state=state)
         self.assertDictEqual(result, {"x": 3, "y": 5})
         self.assertDictEqualNoPrint(state, {"x": 3, "test_dict": {"x": 3, "y": 5}, "_operations_count": 8})
 
     def test_evaluate_expression(self):
         code = "x = 3\ny = 5"
         state = {}
-        result, _ = evaluate(code, {}, state=state)
+        result = evaluate(code, {}, state=state)
         # evaluate returns the value of the last assignment.
         assert result == 5
         self.assertDictEqualNoPrint(state, {"x": 3, "y": 5, "_operations_count": 4})
@@ -118,7 +118,7 @@ class PythonInterpreterTester(unittest.TestCase):
     def test_evaluate_f_string(self):
         code = "text = f'This is x: {x}.'"
         state = {"x": 3}
-        result, _ = evaluate(code, {}, state=state)
+        result = evaluate(code, {}, state=state)
         # evaluate returns the value of the last assignment.
         assert result == "This is x: 3."
         self.assertDictEqualNoPrint(state, {"x": 3, "text": "This is x: 3.", "_operations_count": 6})
@@ -126,13 +126,13 @@ class PythonInterpreterTester(unittest.TestCase):
     def test_evaluate_if(self):
         code = "if x <= 3:\n    y = 2\nelse:\n    y = 5"
         state = {"x": 3}
-        result, _ = evaluate(code, {}, state=state)
+        result = evaluate(code, {}, state=state)
         # evaluate returns the value of the last assignment.
         assert result == 2
         self.assertDictEqualNoPrint(state, {"x": 3, "y": 2, "_operations_count": 6})
 
         state = {"x": 8}
-        result, _ = evaluate(code, {}, state=state)
+        result = evaluate(code, {}, state=state)
         # evaluate returns the value of the last assignment.
         assert result == 5
         self.assertDictEqualNoPrint(state, {"x": 8, "y": 5, "_operations_count": 6})
@@ -140,27 +140,27 @@ class PythonInterpreterTester(unittest.TestCase):
     def test_evaluate_list(self):
         code = "test_list = [x, add_two(x)]"
         state = {"x": 3}
-        result, _ = evaluate(code, {"add_two": add_two}, state=state)
+        result = evaluate(code, {"add_two": add_two}, state=state)
         self.assertListEqual(result, [3, 5])
         self.assertDictEqualNoPrint(state, {"x": 3, "test_list": [3, 5], "_operations_count": 6})
 
     def test_evaluate_name(self):
         code = "y = x"
         state = {"x": 3}
-        result, _ = evaluate(code, {}, state=state)
+        result = evaluate(code, {}, state=state)
         assert result == 3
         self.assertDictEqualNoPrint(state, {"x": 3, "y": 3, "_operations_count": 2})
 
     def test_evaluate_subscript(self):
         code = "test_list = [x, add_two(x)]\ntest_list[1]"
         state = {"x": 3}
-        result, _ = evaluate(code, {"add_two": add_two}, state=state)
+        result = evaluate(code, {"add_two": add_two}, state=state)
         assert result == 5
         self.assertDictEqualNoPrint(state, {"x": 3, "test_list": [3, 5], "_operations_count": 10})
 
         code = "test_dict = {'x': x, 'y': add_two(x)}\ntest_dict['y']"
         state = {"x": 3}
-        result, _ = evaluate(code, {"add_two": add_two}, state=state)
+        result = evaluate(code, {"add_two": add_two}, state=state)
         assert result == 5
         self.assertDictEqualNoPrint(state, {"x": 3, "test_dict": {"x": 3, "y": 5}, "_operations_count": 12})
 
@@ -184,14 +184,14 @@ for result in search_results:
     def test_evaluate_for(self):
         code = "x = 0\nfor i in range(3):\n    x = i"
         state = {}
-        result, _ = evaluate(code, {"range": range}, state=state)
+        result = evaluate(code, {"range": range}, state=state)
         assert result == 2
         self.assertDictEqualNoPrint(state, {"x": 2, "i": 2, "_operations_count": 12})
 
     def test_evaluate_binop(self):
         code = "y + x"
         state = {"x": 3, "y": 6}
-        result, _ = evaluate(code, {}, state=state)
+        result = evaluate(code, {}, state=state)
         assert result == 9
         self.assertDictEqualNoPrint(state, {"x": 3, "y": 6, "_operations_count": 4})
 
@@ -203,27 +203,27 @@ def recur_fibo(n):
     else:
         return(recur_fibo(n-1) + recur_fibo(n-2))
 recur_fibo(6)"""
-        result, _ = evaluate(code, {}, state={})
+        result = evaluate(code, {}, state={})
         assert result == 8
 
     def test_evaluate_string_methods(self):
         code = "'hello'.replace('h', 'o').split('e')"
-        result, _ = evaluate(code, {}, state={})
+        result = evaluate(code, {}, state={})
         assert result == ["o", "llo"]
 
     def test_evaluate_slicing(self):
         code = "'hello'[1:3][::-1]"
-        result, _ = evaluate(code, {}, state={})
+        result = evaluate(code, {}, state={})
         assert result == "le"
 
     def test_access_attributes(self):
         code = "integer = 1\nobj_class = integer.__class__\nobj_class"
-        result, _ = evaluate(code, {}, state={})
+        result = evaluate(code, {}, state={})
         assert result is int
 
     def test_list_comprehension(self):
         code = "sentence = 'THESEAGULL43'\nmeaningful_sentence = '-'.join([char.lower() for char in sentence if char.isalpha()])"
-        result, _ = evaluate(code, {}, state={})
+        result = evaluate(code, {}, state={})
         assert result == "t-h-e-s-e-a-g-u-l-l"
 
     def test_string_indexing(self):
@@ -236,12 +236,12 @@ for block in text_block:
     for col in range(len(text_block[0])):
         sentence += block[col]
         """
-        result, _ = evaluate(code, {"len": len, "range": range}, state={})
+        result = evaluate(code, {"len": len, "range": range}, state={})
         assert result == "THESEAGULL"
 
     def test_tuples(self):
         code = "x = (1, 2, 3)\nx[1]"
-        result, _ = evaluate(code, {}, state={})
+        result = evaluate(code, {}, state={})
         assert result == 2
 
         code = """
@@ -294,52 +294,52 @@ print(check_digits)
 
     def test_listcomp(self):
         code = "x = [i for i in range(3)]"
-        result, _ = evaluate(code, {"range": range}, state={})
+        result = evaluate(code, {"range": range}, state={})
         assert result == [0, 1, 2]
 
     def test_break_continue(self):
         code = "for i in range(10):\n    if i == 5:\n        break\ni"
-        result, _ = evaluate(code, {"range": range}, state={})
+        result = evaluate(code, {"range": range}, state={})
         assert result == 5
 
         code = "for i in range(10):\n    if i == 5:\n        continue\ni"
-        result, _ = evaluate(code, {"range": range}, state={})
+        result = evaluate(code, {"range": range}, state={})
         assert result == 9
 
     def test_call_int(self):
         code = "import math\nstr(math.ceil(149))"
-        result, _ = evaluate(code, {"str": lambda x: str(x)}, state={})
+        result = evaluate(code, {"str": lambda x: str(x)}, state={})
         assert result == "149"
 
     def test_lambda(self):
         code = "f = lambda x: x + 2\nf(3)"
-        result, _ = evaluate(code, {}, state={})
+        result = evaluate(code, {}, state={})
         assert result == 5
 
     def test_dictcomp(self):
         code = "x = {i: i**2 for i in range(3)}"
-        result, _ = evaluate(code, {"range": range}, state={})
+        result = evaluate(code, {"range": range}, state={})
         assert result == {0: 0, 1: 1, 2: 4}
 
         code = "{num: name for num, name in {101: 'a', 102: 'b'}.items() if name not in ['a']}"
-        result, _ = evaluate(code, {"print": print}, state={}, authorized_imports=["pandas"])
+        result = evaluate(code, {"print": print}, state={}, authorized_imports=["pandas"])
         assert result == {102: "b"}
 
         code = """
 shifts = {'A': ('6:45', '8:00'), 'B': ('10:00', '11:45')}
 shift_minutes = {worker: ('a', 'b') for worker, (start, end) in shifts.items()}
 """
-        result, _ = evaluate(code, {}, state={})
+        result = evaluate(code, {}, state={})
         assert result == {"A": ("a", "b"), "B": ("a", "b")}
 
     def test_tuple_assignment(self):
         code = "a, b = 0, 1\nb"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == 1
 
     def test_while(self):
         code = "i = 0\nwhile i < 3:\n    i += 1\ni"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == 3
 
         # test infinite loop
@@ -360,7 +360,7 @@ while i < n and house_positions[i] <= loc:
 
     def test_generator(self):
         code = "a = [1, 2, 3, 4, 5]; b = (i**2 for i in a); list(b)"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == [1, 4, 9, 16, 25]
 
     def test_boolops(self):
@@ -370,7 +370,7 @@ else:
     best_city = "Manhattan"
     best_city
     """
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={"a": 1, "b": 2, "c": 3, "d": 4, "e": 5})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={"a": 1, "b": 2, "c": 3, "d": 4, "e": 5})
         assert result == "Brooklyn"
 
         code = """if d > e and a < b:
@@ -381,7 +381,7 @@ else:
     best_city = "Manhattan"
     best_city
     """
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={"a": 1, "b": 2, "c": 3, "d": 4, "e": 5})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={"a": 1, "b": 2, "c": 3, "d": 4, "e": 5})
         assert result == "Sacramento"
 
     def test_if_conditions(self):
@@ -395,47 +395,47 @@ if char.isalpha():
 
     def test_imports(self):
         code = "import math\nmath.sqrt(4)"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == 2.0
 
         code = "from random import choice, seed\nseed(12)\nchoice(['win', 'lose', 'draw'])"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == "lose"
 
         code = "import time, re\ntime.sleep(0.1)"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result is None
 
         code = "from queue import Queue\nq = Queue()\nq.put(1)\nq.get()"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == 1
 
         code = "import itertools\nlist(itertools.islice(range(10), 3))"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == [0, 1, 2]
 
         code = "import re\nre.search('a', 'abc').group()"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == "a"
 
         code = "import stat\nstat.S_ISREG(0o100644)"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result
 
         code = "import statistics\nstatistics.mean([1, 2, 3, 4, 4])"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == 2.8
 
         code = "import unicodedata\nunicodedata.name('A')"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == "LATIN CAPITAL LETTER A"
 
         # Test submodules are handled properly, thus not raising error
         code = "import numpy.random as rd\nrng = rd.default_rng(12345)\nrng.random()"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={}, authorized_imports=["numpy"])
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={}, authorized_imports=["numpy"])
 
         code = "from numpy.random import default_rng as d_rng\nrng = d_rng(12345)\nrng.random()"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={}, authorized_imports=["numpy"])
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={}, authorized_imports=["numpy"])
 
     def test_additional_imports(self):
         code = "import numpy as np"
@@ -450,26 +450,26 @@ if char.isalpha():
 
     def test_multiple_comparators(self):
         code = "0 <= -1 < 4 and 0 <= -5 < 4"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert not result
 
         code = "0 <= 1 < 4 and 0 <= -5 < 4"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert not result
 
         code = "0 <= 4 < 4 and 0 <= 3 < 4"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert not result
 
         code = "0 <= 3 < 4 and 0 <= 3 < 4"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result
 
     def test_print_output(self):
         code = "print('Hello world!')\nprint('Ok no one cares')"
         state = {}
         stdout = io.StringIO()
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state=state, stdout=stdout)
+        result = evaluate(code, BASE_PYTHON_TOOLS, state=state, stdout=stdout)
         assert result is None
         assert stdout.getvalue() == "Hello world!\nOk no one cares\n"
 
@@ -497,7 +497,7 @@ def function():
 
     def test_tuple_target_in_iterator(self):
         code = "for a, b in [('Ralf Weikert', 'Austria'), ('Samuel Seungwon Lee', 'South Korea')]:res = a.split()[0]"
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state={})
+        result = evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == "Samuel"
 
     def test_classes(self):
@@ -590,7 +590,7 @@ def var_args_method(self, *args, **kwargs):
 var_args_method(1, 2, 3, x=4, y=5)
 """
         state = {}
-        result, _ = evaluate(code, {"sum": sum}, state=state)
+        result = evaluate(code, {"sum": sum}, state=state)
         assert result == 15
 
     def test_exceptions(self):
@@ -621,7 +621,7 @@ except ValueError as e:
     def test_types_as_objects(self):
         code = "type_a = float(2); type_b = str; type_c = int"
         state = {}
-        result, is_final_answer = evaluate(code, {"float": float, "str": str, "int": int}, state=state)
+        result = evaluate(code, {"float": float, "str": str, "int": int}, state=state)
         assert result is int
 
     def test_tuple_id(self):
@@ -630,7 +630,7 @@ food_items = {"apple": 2, "banana": 3, "orange": 1, "pear": 1}
 unique_food_items = [item for item, count in food_items.items() if count == 1]
 """
         state = {}
-        result, is_final_answer = evaluate(code, {}, state=state)
+        result = evaluate(code, {}, state=state)
         assert result == ["orange", "pear"]
 
     def test_nonsimple_augassign(self):
@@ -720,9 +720,8 @@ def f(a, b=333, n=1000):
     return b + n
 n = f(1, n=667)
 """
-        res, is_final_answer = evaluate(code, {}, {})
+        res = evaluate(code, {}, {})
         assert res == 1000
-        assert not is_final_answer
 
     def test_set(self):
         code = """
@@ -746,9 +745,8 @@ while True:
         break
 
 i"""
-        result, is_final_answer = evaluate(code, {"print": print, "round": round}, state={})
+        result = evaluate(code, {"print": print, "round": round}, state={})
         assert result == 3
-        assert not is_final_answer
 
     def test_return(self):
         # test early returns
@@ -761,7 +759,7 @@ def add_one(n, shift):
 add_one(1, 1)
 """
         state = {}
-        result, is_final_answer = evaluate(
+        result = evaluate(
             code, {"print": print, "range": range, "ord": ord, "chr": chr}, state=state
         )
         assert result == 2
@@ -774,7 +772,7 @@ def returns_none(a):
 returns_none(1)
 """
         state = {}
-        result, is_final_answer = evaluate(
+        result = evaluate(
             code, {"print": print, "range": range, "ord": ord, "chr": chr}, state=state
         )
         assert result is None
@@ -792,7 +790,7 @@ out = [i for sublist in all_res for i in sublist]
 out[:10]
 """
         state = {}
-        result, is_final_answer = evaluate(code, {"print": print, "range": range}, state=state)
+        result = evaluate(code, {"print": print, "range": range}, state=state)
         assert result == [0, 0, 1, 0, 1, 2, 0, 1, 2, 3]
 
     def test_pandas(self):
@@ -807,7 +805,7 @@ parts_with_5_set_count = df[df['SetCount'] == 5.0]
 parts_with_5_set_count[['Quantity', 'SetCount']].values[1]
 """
         state = {}
-        result, _ = evaluate(code, {}, state=state, authorized_imports=["pandas"])
+        result = evaluate(code, {}, state=state, authorized_imports=["pandas"])
         assert np.array_equal(result, [-1, 5])
 
         code = """
@@ -818,7 +816,7 @@ df = pd.DataFrame.from_dict({"AtomicNumber": [111, 104, 105], "ok": [0, 1, 2]})
 # Filter the DataFrame to get only the rows with outdated atomic numbers
 filtered_df = df.loc[df['AtomicNumber'].isin([104])]
 """
-        result, _ = evaluate(code, {"print": print}, state={}, authorized_imports=["pandas"])
+        result = evaluate(code, {"print": print}, state={}, authorized_imports=["pandas"])
         assert np.array_equal(result.values[0], [104, 1])
 
         # Test groupby
@@ -830,7 +828,7 @@ data = pd.DataFrame.from_dict([
 ])
 survival_rate_by_class = data.groupby('Pclass')['Survived'].mean()
 """
-        result, _ = evaluate(code, {}, state={}, authorized_imports=["pandas"])
+        result = evaluate(code, {}, state={}, authorized_imports=["pandas"])
         assert result.values[1] == 0.5
 
         # Test loc and iloc
@@ -844,7 +842,7 @@ survival_rate_biased = data.loc[data['Survived']==1]['Survived'].mean()
 survival_rate_biased = data.loc[data['Survived']==1]['Survived'].mean()
 survival_rate_sorted = data.sort_values(by='Survived', ascending=False).iloc[0]
 """
-        result, _ = evaluate(code, {}, state={}, authorized_imports=["pandas"])
+        result = evaluate(code, {}, state={}, authorized_imports=["pandas"])
 
     def test_starred(self):
         code = """
@@ -865,7 +863,7 @@ coords_barcelona = (41.3869, 2.1660)
 
 distance_geneva_barcelona = haversine(*coords_geneva, *coords_barcelona)
 """
-        result, _ = evaluate(code, {"print": print, "map": map}, state={}, authorized_imports=["math"])
+        result = evaluate(code, {"print": print, "map": map}, state={}, authorized_imports=["math"])
         assert round(result, 1) == 622395.4
 
     def test_for(self):
@@ -880,7 +878,7 @@ for worker, (start, end) in shifts.items():
     shift_intervals[worker] = end
 shift_intervals
 """
-        result, _ = evaluate(code, {"print": print, "map": map}, state={})
+        result = evaluate(code, {"print": print, "map": map}, state={})
         assert result == {"Worker A": "8:00 pm", "Worker B": "11:45 am"}
 
     def test_syntax_error_points_error(self):
@@ -1025,7 +1023,7 @@ texec(tcompile("1 + 1", "no filename", "exec"))
 )
 def test_evaluate_augassign(code, expected_result):
     state = {}
-    result, _ = evaluate(code, {}, state=state)
+    result = evaluate(code, {}, state=state)
     assert result == expected_result
 
 
@@ -1052,7 +1050,7 @@ def test_evaluate_augassign_number(operator, expected_result):
         x {operator} 2
     """).format(operator=operator)
     state = {}
-    result, _ = evaluate(code, {}, state=state)
+    result = evaluate(code, {}, state=state)
     assert result == expected_result
 
 
@@ -1101,7 +1099,7 @@ def test_evaluate_augassign_custom(operator, expected_result):
         x.value
     """).format(operator=operator, operator_name=operator_names[operator])
     state = {}
-    result, _ = evaluate(code, {}, state=state)
+    result = evaluate(code, {}, state=state)
     assert result == expected_result
 
 
@@ -1333,7 +1331,7 @@ def test_non_standard_comparisons():
         b = NonStdComparisonClass("b")
         result = a == b
         """)
-    result, _ = evaluate(code, state={})
+    result = evaluate(code, state={})
     assert not isinstance(result, bool)
     assert str(result) == "a == b"
 
@@ -1379,7 +1377,7 @@ def test__name__():
         def foo(): return 0
         foo.__name__
         """)
-    result, _ = evaluate(code, {}, {})
+    result = evaluate(code, {}, {})
     assert result == "foo"
 
 def test_function_returning_function():
@@ -1388,7 +1386,7 @@ def test_function_returning_function():
             return lambda x: x + 1
         f()(1)
         """)
-    result, _ = evaluate(code, {}, {})
+    result = evaluate(code, {}, {})
     assert result == 2
 
 def test_custom_subscriptable():
@@ -1401,7 +1399,7 @@ def test_custom_subscriptable():
         my_list = MyList(["a", "b", "c"])
         my_list[1]
         """)
-    result, _ = evaluate(code, {}, {})
+    result = evaluate(code, {}, {})
     assert result == "b"
 
 def test_not_callable_error():
