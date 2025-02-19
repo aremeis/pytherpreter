@@ -20,8 +20,9 @@ import ast
 import builtins
 import inspect
 import logging
+import sys
 from types import ModuleType
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, TextIO, Tuple
 
 from .python_interpreter import (
     BASE_BUILTIN_MODULES,
@@ -33,8 +34,6 @@ from .python_interpreter import (
     ContinueException,
     ReturnException,
     InterpreterError,
-    PrintContainer,
-    truncate_content,
     evaluate_lambda, 
     evaluate_function_def,
     evaluate_name,
@@ -46,6 +45,16 @@ ASYNC_BASE_BUILTIN_MODULES = BASE_BUILTIN_MODULES.copy() + ["asyncio"]
 
 
 logger = logging.getLogger(__name__)
+
+
+async def async_all(async_generator):
+    """Async version of all() that works with async generators.
+    Returns True if all elements in the async generator are truthy, False otherwise.
+    Short-circuits on first falsy value."""
+    async for item in async_generator:
+        if not item:
+            return False
+    return True
 
 
 async def evaluate_unaryop(
@@ -428,19 +437,15 @@ async def evaluate_call(
         else:
             raise InterpreterError("super() takes at most 2 arguments")
     else:
-        if func_name == "print":
-            state["_print_outputs"] += " ".join(map(str, args)) + "\n"
-            return None
-        else:  # Assume it's a callable object
-            if (
-                (inspect.getmodule(func) == builtins)
-                and inspect.isbuiltin(func)
-                and (func not in static_tools.values())
-            ):
-                raise InterpreterError(
-                    f"Invoking a builtin function that has not been explicitly added as a tool is not allowed ({func_name})."
-                )
-            return func(*args, **kwargs)
+        if (
+            (inspect.getmodule(func) == builtins)
+            and inspect.isbuiltin(func)
+            and (func not in static_tools.values())
+        ):
+            raise InterpreterError(
+                f"Invoking a builtin function that has not been explicitly added as a tool is not allowed ({func_name})."
+            )
+        return func(*args, **kwargs)
 
 
 async def evaluate_subscript(
@@ -586,11 +591,11 @@ async def evaluate_listcomp(
                     new_state[elem.id] = value[idx]
             else:
                 new_state[generator.target.id] = value
-            if all(
+            if await async_all(
                 await evaluate_ast(if_clause, new_state, static_tools, custom_tools, authorized_imports)
                 for if_clause in generator.ifs
             ):
-                result.extend(inner_evaluate(generators, index + 1, new_state))
+                result.extend(await inner_evaluate(generators, index + 1, new_state))
         return result
 
     return await inner_evaluate(listcomp.generators, 0, state)
@@ -769,7 +774,7 @@ async def evaluate_dictcomp(
                 custom_tools,
                 authorized_imports,
             )
-            if all(
+            if await async_all(
                 await evaluate_ast(if_clause, new_state, static_tools, custom_tools, authorized_imports)
                 for if_clause in gen.ifs
             ):
@@ -873,7 +878,7 @@ async def evaluate_ast(
         # Constant -> just return the value
         return expression.value
     elif isinstance(expression, ast.Tuple):
-        return tuple(await evaluate_ast(elt, *common_params) for elt in expression.elts)
+        return tuple([await evaluate_ast(elt, *common_params) for elt in expression.elts])
     elif isinstance(expression, (ast.ListComp, ast.GeneratorExp)):
         return await evaluate_listcomp(expression, *common_params)
     elif isinstance(expression, ast.UnaryOp):
@@ -988,7 +993,7 @@ async def async_evaluate(
     custom_tools: Optional[Dict[str, Callable]] = None,
     state: Optional[Dict[str, Any]] = None,
     authorized_imports: List[str] = ASYNC_BASE_BUILTIN_MODULES,
-    max_print_outputs_length: int = DEFAULT_MAX_LEN_OUTPUT,
+    stdout: Optional[TextIO] = sys.stdout,
 ):
     """
     Asynchronously evaluate a python expression using the content of the variables stored in a state and only evaluating a given set
@@ -1006,7 +1011,8 @@ async def async_evaluate(
         state (`Dict[str, Any]`):
             A dictionary mapping variable names to values. The `state` should contain the initial inputs but will be
             updated by this function to contain all variables as they are evaluated.
-            The print outputs will be stored in the state under the key "_print_outputs".
+        stdout (`TextIO`):
+            The stream to be used for print outputs. If None, the print function will be a no-op. Defaults to sys.stdout.
     """
     try:
         expression = ast.parse(code)
@@ -1020,10 +1026,22 @@ async def async_evaluate(
 
     if state is None:
         state = {}
+
+    def get_print_function(stdout: Optional[TextIO]):
+        """Generate a print function that writes to `stdout` by default."""
+        def print_function(*args, **kwargs):
+            if stdout is None:
+                return None
+            if "file" not in kwargs:
+                kwargs["file"] = stdout
+            return print(*args, **kwargs)
+        return print_function
+    
+    static_tools = static_tools.copy() if static_tools is not None else {}
+    static_tools["print"] = get_print_function(stdout)
     static_tools = static_tools.copy() if static_tools is not None else {}
     custom_tools = custom_tools if custom_tools is not None else {}
     result = None
-    state["_print_outputs"] = PrintContainer()
 
     def final_answer(value):
         raise FinalAnswerException(value)
@@ -1033,21 +1051,12 @@ async def async_evaluate(
     try:
         for node in expression.body:
             result = await evaluate_ast(node, state, static_tools, custom_tools, authorized_imports)
-        state["_print_outputs"].value = truncate_content(
-            str(state["_print_outputs"]), max_length=max_print_outputs_length
-        )
         is_final_answer = False
         return result, is_final_answer
     except FinalAnswerException as e:
-        state["_print_outputs"].value = truncate_content(
-            str(state["_print_outputs"]), max_length=max_print_outputs_length
-        )
         is_final_answer = True
         return e.value, is_final_answer
     except Exception as e:
-        state["_print_outputs"].value = truncate_content(
-            str(state["_print_outputs"]), max_length=max_print_outputs_length
-        )
         raise InterpreterError(
             f"Code execution failed at line '{ast.get_source_segment(code, node)}' due to: {type(e).__name__}: {e}"
         )
@@ -1086,7 +1095,7 @@ class AsyncPythonInterpreter:
             authorized_imports=self.authorized_imports,
             max_print_outputs_length=self.max_print_outputs_length,
         )
-        logs = str(self.state["_print_outputs"])
+        logs = None
         return output, logs, is_final_answer
 
 

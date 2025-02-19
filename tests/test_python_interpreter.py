@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import ast
+import io
 import types
 import unittest
 from textwrap import dedent
@@ -26,7 +27,6 @@ import pytest
 from pytherpreter.python_interpreter import BASE_PYTHON_TOOLS
 from pytherpreter.python_interpreter import (
     InterpreterError,
-    PrintContainer,
     check_module_authorized,
     evaluate_condition,
     evaluate_delete,
@@ -389,8 +389,9 @@ else:
 if char.isalpha():
     print('2')"""
         state = {}
-        evaluate(code, BASE_PYTHON_TOOLS, state=state)
-        assert state["_print_outputs"].value == "2\n"
+        stdout = io.StringIO()
+        evaluate(code, BASE_PYTHON_TOOLS, state=state, stdout=stdout)
+        assert stdout.getvalue() == "2\n"
 
     def test_imports(self):
         code = "import math\nmath.sqrt(4)"
@@ -467,9 +468,10 @@ if char.isalpha():
     def test_print_output(self):
         code = "print('Hello world!')\nprint('Ok no one cares')"
         state = {}
-        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state=state)
+        stdout = io.StringIO()
+        result, _ = evaluate(code, BASE_PYTHON_TOOLS, state=state, stdout=stdout)
         assert result is None
-        assert state["_print_outputs"].value == "Hello world!\nOk no one cares\n"
+        assert stdout.getvalue() == "Hello world!\nOk no one cares\n"
 
         # Test print in function (state copy)
         code = """
@@ -478,8 +480,9 @@ def function():
     print("2")
 function()"""
         state = {}
-        evaluate(code, {"print": print}, state=state)
-        assert state["_print_outputs"].value == "1\n2\n"
+        stdout = io.StringIO()
+        evaluate(code, {"print": print}, state=state, stdout=stdout)
+        assert stdout.getvalue() == "1\n2\n"
 
         # Test print in list comprehension (state copy)
         code = """
@@ -488,8 +491,9 @@ def function():
     print("2")
 [function() for i in range(10)]"""
         state = {}
-        evaluate(code, {"print": print, "range": range}, state=state)
-        assert state["_print_outputs"].value == "1\n2\n2\n2\n2\n2\n2\n2\n2\n2\n2\n"
+        stdout = io.StringIO()
+        evaluate(code, {"print": print, "range": range}, state=state, stdout=stdout)
+        assert stdout.getvalue() == "1\n2\n2\n2\n2\n2\n2\n2\n2\n2\n2\n"
 
     def test_tuple_target_in_iterator(self):
         code = "for a, b in [('Ralf Weikert', 'Austria'), ('Samuel Seungwon Lee', 'South Korea')]:res = a.split()[0]"
@@ -610,8 +614,9 @@ except ValueError as e:
     def test_print(self):
         code = "print(min([1, 2, 3]))"
         state = {}
-        evaluate(code, {"min": min, "print": print}, state=state)
-        assert state["_print_outputs"].value == "1\n"
+        stdout = io.StringIO()
+        evaluate(code, {"min": min, "print": print}, state=state, stdout=stdout)
+        assert stdout.getvalue() == "1\n"
 
     def test_types_as_objects(self):
         code = "type_a = float(2); type_b = str; type_c = int"
@@ -1331,37 +1336,6 @@ def test_non_standard_comparisons():
     result, _ = evaluate(code, state={})
     assert not isinstance(result, bool)
     assert str(result) == "a == b"
-
-
-class TestPrintContainer:
-    def test_initial_value(self):
-        pc = PrintContainer()
-        assert pc.value == ""
-
-    def test_append(self):
-        pc = PrintContainer()
-        pc.append("Hello")
-        assert pc.value == "Hello"
-
-    def test_iadd(self):
-        pc = PrintContainer()
-        pc += "World"
-        assert pc.value == "World"
-
-    def test_str(self):
-        pc = PrintContainer()
-        pc.append("Hello")
-        assert str(pc) == "Hello"
-
-    def test_repr(self):
-        pc = PrintContainer()
-        pc.append("Hello")
-        assert repr(pc) == "PrintContainer(Hello)"
-
-    def test_len(self):
-        pc = PrintContainer()
-        pc.append("Hello")
-        assert len(pc) == 5
 
 
 @pytest.mark.parametrize(

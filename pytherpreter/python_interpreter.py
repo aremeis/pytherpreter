@@ -23,24 +23,12 @@ import logging
 import math
 import re
 from importlib import import_module
+import sys
 from types import ModuleType
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, TextIO
 
 
 logger = logging.getLogger(__name__)
-
-
-MAX_LENGTH_TRUNCATE_CONTENT = 20000
-
-def truncate_content(content: str, max_length: int = MAX_LENGTH_TRUNCATE_CONTENT) -> str:
-    if len(content) <= max_length:
-        return content
-    else:
-        return (
-            content[: max_length // 2]
-            + f"\n..._This content has been truncated to stay below {max_length} characters_...\n"
-            + content[-max_length // 2 :]
-        )
 
 
 BASE_BUILTIN_MODULES = [
@@ -78,13 +66,7 @@ MAX_OPERATIONS = 10000000
 MAX_WHILE_ITERATIONS = 1000000
 
 
-def custom_print(*args):
-    return None
-custom_print.__name__ = "print"
-
-
 BASE_PYTHON_TOOLS = {
-    "print": custom_print,
     "isinstance": isinstance,
     "range": range,
     "float": float,
@@ -137,32 +119,6 @@ BASE_PYTHON_TOOLS = {
     "type": type,
     "complex": complex,
 }
-
-
-class PrintContainer:
-    def __init__(self):
-        self.value = ""
-
-    def append(self, text):
-        self.value += text
-        return self
-
-    def __iadd__(self, other):
-        """Implements the += operator"""
-        self.value += str(other)
-        return self
-
-    def __str__(self):
-        """String representation"""
-        return self.value
-
-    def __repr__(self):
-        """Representation for debugging"""
-        return f"PrintContainer({self.value})"
-
-    def __len__(self):
-        """Implements len() function support"""
-        return len(self.value)
 
 
 class BreakException(Exception):
@@ -619,19 +575,15 @@ def evaluate_call(
         else:
             raise InterpreterError("super() takes at most 2 arguments")
     else:
-        if func_name == "print":
-            state["_print_outputs"] += " ".join(map(str, args)) + "\n"
-            return None
-        else:  # Assume it's a callable object
-            if (
-                (inspect.getmodule(func) == builtins)
-                and inspect.isbuiltin(func)
-                and (func not in static_tools.values())
-            ):
-                raise InterpreterError(
-                    f"Invoking a builtin function that has not been explicitly added as a tool is not allowed ({func_name})."
-                )
-            return func(*args, **kwargs)
+        if (
+            (inspect.getmodule(func) == builtins)
+            and inspect.isbuiltin(func)
+            and (func not in static_tools.values())
+        ):
+            raise InterpreterError(
+                f"Invoking a builtin function that has not been explicitly added as a tool is not allowed ({func_name})."
+            )
+        return func(*args, **kwargs)
 
 
 def evaluate_subscript(
@@ -1259,7 +1211,7 @@ def evaluate(
     custom_tools: Optional[Dict[str, Callable]] = None,
     state: Optional[Dict[str, Any]] = None,
     authorized_imports: List[str] = BASE_BUILTIN_MODULES,
-    max_print_outputs_length: int = DEFAULT_MAX_LEN_OUTPUT,
+    stdout: Optional[TextIO] = sys.stdout,
 ):
     """
     Evaluate a python expression using the content of the variables stored in a state and only evaluating a given set
@@ -1277,7 +1229,8 @@ def evaluate(
         state (`Dict[str, Any]`):
             A dictionary mapping variable names to values. The `state` should contain the initial inputs but will be
             updated by this function to contain all variables as they are evaluated.
-            The print outputs will be stored in the state under the key "_print_outputs".
+        stdout (`TextIO`):
+            The stream to be used for print outputs. If None, the print function will be a no-op. Defaults to sys.stdout.
     """
     try:
         expression = ast.parse(code)
@@ -1291,10 +1244,21 @@ def evaluate(
 
     if state is None:
         state = {}
+
+    def get_print_function(stdout: Optional[TextIO]):
+        """Generate a print function that writes to `stdout` by default."""
+        def print_function(*args, **kwargs):
+            if stdout is None:
+                return None
+            if "file" not in kwargs:
+                kwargs["file"] = stdout
+            return print(*args, **kwargs)
+        return print_function
+    
     static_tools = static_tools.copy() if static_tools is not None else {}
+    static_tools["print"] = get_print_function(stdout)
     custom_tools = custom_tools if custom_tools is not None else {}
     result = None
-    state["_print_outputs"] = PrintContainer()
 
     def final_answer(value):
         raise FinalAnswerException(value)
@@ -1304,24 +1268,17 @@ def evaluate(
     try:
         for node in expression.body:
             result = evaluate_ast(node, state, static_tools, custom_tools, authorized_imports)
-        state["_print_outputs"].value = truncate_content(
-            str(state["_print_outputs"]), max_length=max_print_outputs_length
-        )
         is_final_answer = False
         return result, is_final_answer
     except FinalAnswerException as e:
-        state["_print_outputs"].value = truncate_content(
-            str(state["_print_outputs"]), max_length=max_print_outputs_length
-        )
         is_final_answer = True
         return e.value, is_final_answer
     except Exception as e:
-        state["_print_outputs"].value = truncate_content(
-            str(state["_print_outputs"]), max_length=max_print_outputs_length
-        )
         raise InterpreterError(
             f"Code execution failed at line '{ast.get_source_segment(code, node)}' due to: {type(e).__name__}: {e}"
         )
+    finally:
+        pass
 
 
 class PythonInterpreter:
@@ -1357,8 +1314,8 @@ class PythonInterpreter:
             authorized_imports=self.authorized_imports,
             max_print_outputs_length=self.max_print_outputs_length,
         )
-        logs = str(self.state["_print_outputs"])
+        logs = None
         return output, logs, is_final_answer
 
 
-__all__ = ["evaluate", "PythonInterpreter", "BASE_PYTHON_TOOLS", "MAX_LENGTH_TRUNCATE_CONTENT", "DEFAULT_MAX_LEN_OUTPUT", "MAX_OPERATIONS", "MAX_WHILE_ITERATIONS"]
+__all__ = ["evaluate", "PythonInterpreter", "BASE_PYTHON_TOOLS", "DEFAULT_MAX_LEN_OUTPUT", "MAX_OPERATIONS", "MAX_WHILE_ITERATIONS"]

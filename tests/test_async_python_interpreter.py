@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import ast
+import io
 import types
 import unittest
 from textwrap import dedent
@@ -26,7 +27,6 @@ import pytest
 from pytherpreter.python_interpreter import (
     BASE_PYTHON_TOOLS,
     InterpreterError,
-    PrintContainer,
     check_module_authorized,
     fix_final_answer_code,
     get_safe_module,
@@ -43,12 +43,21 @@ def add_two(x):
     return x + 2
 
 
-class PythonInterpreterTester(unittest.TestCase):
+class TestAsyncPythonInterpreter():
+    def assertDictEqual(self, dict1, dict2):
+        assert dict1 == dict2, f"Dictionaries not equal:\n{dict1}\n!=\n{dict2}"
+        
     def assertDictEqualNoPrint(self, dict1, dict2):
-        return self.assertDictEqual(
-            {k: v for k, v in dict1.items() if k != "_print_outputs"},
-            {k: v for k, v in dict2.items() if k != "_print_outputs"},
-        )
+        filtered1 = {k: v for k, v in dict1.items() if k != "_print_outputs"}
+        filtered2 = {k: v for k, v in dict2.items() if k != "_print_outputs"}
+        assert filtered1 == filtered2, f"Dictionaries not equal:\n{filtered1}\n!=\n{filtered2}"
+
+    def assertListEqual(self, list1, list2):
+        assert list1 == list2, f"Lists not equal:\n{list1}\n!=\n{list2}"
+
+    # @pytest.mark.asyncio
+    # async def test_fail(self):
+    #     assert False
 
     @pytest.mark.asyncio
     async def test_evaluate_assign(self):
@@ -75,6 +84,7 @@ class PythonInterpreterTester(unittest.TestCase):
             await async_evaluate(code, {"print": print}, state={})
         assert "Cannot assign to name 'print': doing this would erase the existing tool!" in str(e)
 
+    @pytest.mark.asyncio
     async def test_subscript_call(self):
         code = """def foo(x,y):return x*y\n\ndef boo(y):\n\treturn y**3\nfun = [foo, boo]\nresult_foo = fun[0](4,2)\nresult_boo = fun[1](4)"""
         state = {}
@@ -83,6 +93,7 @@ class PythonInterpreterTester(unittest.TestCase):
         assert state["result_foo"] == 8
         assert state["result_boo"] == 64
 
+    @pytest.mark.asyncio
     async def test_evaluate_call(self):
         code = "y = add_two(x)"
         state = {"x": 3}
@@ -95,6 +106,7 @@ class PythonInterpreterTester(unittest.TestCase):
             await async_evaluate(code, {}, state=state)
         assert "The name `add_two` is not defined" in str(e.value)
 
+    @pytest.mark.asyncio
     async def test_evaluate_constant(self):
         code = "x = 3"
         state = {}
@@ -102,6 +114,7 @@ class PythonInterpreterTester(unittest.TestCase):
         assert result == 3
         self.assertDictEqualNoPrint(state, {"x": 3, "_operations_count": 2})
 
+    @pytest.mark.asyncio
     async def test_evaluate_dict(self):
         code = "test_dict = {'x': x, 'y': add_two(x)}"
         state = {"x": 3}
@@ -109,6 +122,7 @@ class PythonInterpreterTester(unittest.TestCase):
         self.assertDictEqual(result, {"x": 3, "y": 5})
         self.assertDictEqualNoPrint(state, {"x": 3, "test_dict": {"x": 3, "y": 5}, "_operations_count": 8})
 
+    @pytest.mark.asyncio
     async def test_evaluate_expression(self):
         code = "x = 3\ny = 5"
         state = {}
@@ -116,6 +130,7 @@ class PythonInterpreterTester(unittest.TestCase):
         assert result == 5
         self.assertDictEqualNoPrint(state, {"x": 3, "y": 5, "_operations_count": 4})
 
+    @pytest.mark.asyncio
     async def test_evaluate_f_string(self):
         code = "text = f'This is x: {x}.'"
         state = {"x": 3}
@@ -123,6 +138,7 @@ class PythonInterpreterTester(unittest.TestCase):
         assert result == "This is x: 3."
         self.assertDictEqualNoPrint(state, {"x": 3, "text": "This is x: 3.", "_operations_count": 6})
 
+    @pytest.mark.asyncio
     async def test_evaluate_if(self):
         code = "if x <= 3:\n    y = 2\nelse:\n    y = 5"
         state = {"x": 3}
@@ -135,6 +151,7 @@ class PythonInterpreterTester(unittest.TestCase):
         assert result == 5
         self.assertDictEqualNoPrint(state, {"x": 8, "y": 5, "_operations_count": 6})
 
+    @pytest.mark.asyncio
     async def test_evaluate_list(self):
         code = "test_list = [x, add_two(x)]"
         state = {"x": 3}
@@ -142,6 +159,7 @@ class PythonInterpreterTester(unittest.TestCase):
         self.assertListEqual(result, [3, 5])
         self.assertDictEqualNoPrint(state, {"x": 3, "test_list": [3, 5], "_operations_count": 6})
 
+    @pytest.mark.asyncio
     async def test_evaluate_name(self):
         code = "y = x"
         state = {"x": 3}
@@ -149,6 +167,7 @@ class PythonInterpreterTester(unittest.TestCase):
         assert result == 3
         self.assertDictEqualNoPrint(state, {"x": 3, "y": 3, "_operations_count": 2})
 
+    @pytest.mark.asyncio
     async def test_evaluate_subscript(self):
         code = "test_list = [x, add_two(x)]\ntest_list[1]"
         state = {"x": 3}
@@ -167,6 +186,7 @@ class PythonInterpreterTester(unittest.TestCase):
         await async_evaluate(code, {"min": min, "print": print, "round": round}, state=state)
         assert state["vendor"] == {"revenue": 31000, "rent": 50312, "ratio": 0.62}
 
+    @pytest.mark.asyncio
     async def test_subscript_string_with_string_index_raises_appropriate_error(self):
         code = """
 search_results = "[{'title': 'Paris, Ville de Paris, France Weather Forecast | AccuWeather', 'href': 'https://www.accuweather.com/en/fr/paris/623/weather-forecast/623', 'body': 'Get the latest weather forecast for Paris, Ville de Paris, France , including hourly, daily, and 10-day outlooks. AccuWeather provides you with reliable and accurate information on temperature ...'}]"
@@ -179,6 +199,7 @@ for result in search_results:
             await async_evaluate(code, BASE_PYTHON_TOOLS, state={})
             assert "You're trying to subscript a string with a string index" in e
 
+    @pytest.mark.asyncio
     async def test_evaluate_for(self):
         code = "x = 0\nfor i in range(3):\n    x = i"
         state = {}
@@ -186,6 +207,7 @@ for result in search_results:
         assert result == 2
         self.assertDictEqualNoPrint(state, {"x": 2, "i": 2, "_operations_count": 12})
 
+    @pytest.mark.asyncio
     async def test_evaluate_binop(self):
         code = "y + x"
         state = {"x": 3, "y": 6}
@@ -193,6 +215,7 @@ for result in search_results:
         assert result == 9
         self.assertDictEqualNoPrint(state, {"x": 3, "y": 6, "_operations_count": 4})
 
+    @pytest.mark.asyncio
     async def test_recursive_function(self):
         code = """
 def recur_fibo(n):
@@ -204,26 +227,31 @@ recur_fibo(6)"""
         result, _ = await async_evaluate(code, {}, state={})
         assert result == 8
 
+    @pytest.mark.asyncio
     async def test_evaluate_string_methods(self):
         code = "'hello'.replace('h', 'o').split('e')"
         result, _ = await async_evaluate(code, {}, state={})
         assert result == ["o", "llo"]
 
+    @pytest.mark.asyncio
     async def test_evaluate_slicing(self):
         code = "'hello'[1:3][::-1]"
         result, _ = await async_evaluate(code, {}, state={})
         assert result == "le"
 
+    @pytest.mark.asyncio
     async def test_access_attributes(self):
         code = "integer = 1\nobj_class = integer.__class__\nobj_class"
         result, _ = await async_evaluate(code, {}, state={})
         assert result is int
 
+    @pytest.mark.asyncio
     async def test_list_comprehension(self):
         code = "sentence = 'THESEAGULL43'\nmeaningful_sentence = '-'.join([char.lower() for char in sentence if char.isalpha()])"
         result, _ = await async_evaluate(code, {}, state={})
         assert result == "t-h-e-s-e-a-g-u-l-l"
 
+    @pytest.mark.asyncio
     async def test_string_indexing(self):
         code = """text_block = [
     "THESE",
@@ -237,6 +265,7 @@ for block in text_block:
         result, _ = await async_evaluate(code, {"len": len, "range": range}, state={})
         assert result == "THESEAGULL"
 
+    @pytest.mark.asyncio
     async def test_tuples(self):
         code = "x = (1, 2, 3)\nx[1]"
         result, _ = await async_evaluate(code, {}, state={})
@@ -290,11 +319,13 @@ print(check_digits)
             state,
         )
 
+    @pytest.mark.asyncio
     async def test_listcomp(self):
         code = "x = [i for i in range(3)]"
         result, _ = await async_evaluate(code, {"range": range}, state={})
         assert result == [0, 1, 2]
 
+    @pytest.mark.asyncio
     async def test_break_continue(self):
         code = "for i in range(10):\n    if i == 5:\n        break\ni"
         result, _ = await async_evaluate(code, {"range": range}, state={})
@@ -304,16 +335,19 @@ print(check_digits)
         result, _ = await async_evaluate(code, {"range": range}, state={})
         assert result == 9
 
+    @pytest.mark.asyncio
     async def test_call_int(self):
         code = "import math\nstr(math.ceil(149))"
         result, _ = await async_evaluate(code, {"str": lambda x: str(x)}, state={})
         assert result == "149"
 
+    @pytest.mark.asyncio
     async def test_lambda(self):
         code = "f = lambda x: x + 2\nf(3)"
         result, _ = await async_evaluate(code, {}, state={})
         assert result == 5
 
+    @pytest.mark.asyncio
     async def test_dictcomp(self):
         code = "x = {i: i**2 for i in range(3)}"
         result, _ = await async_evaluate(code, {"range": range}, state={})
@@ -330,11 +364,13 @@ shift_minutes = {worker: ('a', 'b') for worker, (start, end) in shifts.items()}
         result, _ = await async_evaluate(code, {}, state={})
         assert result == {"A": ("a", "b"), "B": ("a", "b")}
 
+    @pytest.mark.asyncio
     async def test_tuple_assignment(self):
         code = "a, b = 0, 1\nb"
         result, _ = await async_evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == 1
 
+    @pytest.mark.asyncio
     async def test_while(self):
         code = "i = 0\nwhile i < 3:\n    i += 1\ni"
         result, _ = await async_evaluate(code, BASE_PYTHON_TOOLS, state={})
@@ -356,11 +392,13 @@ while i < n and house_positions[i] <= loc:
         state = {}
         await async_evaluate(code, BASE_PYTHON_TOOLS, state=state)
 
+    @pytest.mark.asyncio
     async def test_generator(self):
         code = "a = [1, 2, 3, 4, 5]; b = (i**2 for i in a); list(b)"
         result, _ = await async_evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == [1, 4, 9, 16, 25]
 
+    @pytest.mark.asyncio
     async def test_boolops(self):
         code = """if (not (a > b and a > c)) or d > e:
     best_city = "Brooklyn"
@@ -382,14 +420,17 @@ else:
         result, _ = await async_evaluate(code, BASE_PYTHON_TOOLS, state={"a": 1, "b": 2, "c": 3, "d": 4, "e": 5})
         assert result == "Sacramento"
 
+    @pytest.mark.asyncio
     async def test_if_conditions(self):
         code = """char='a'
 if char.isalpha():
     print('2')"""
         state = {}
-        await async_evaluate(code, BASE_PYTHON_TOOLS, state=state)
-        assert state["_print_outputs"].value == "2\n"
+        stdout = io.StringIO()
+        await async_evaluate(code, BASE_PYTHON_TOOLS, state=state, stdout=stdout)
+        assert stdout.getvalue() == "2\n"
 
+    @pytest.mark.asyncio
     async def test_imports(self):
         code = "import math\nmath.sqrt(4)"
         result, _ = await async_evaluate(code, BASE_PYTHON_TOOLS, state={})
@@ -434,6 +475,7 @@ if char.isalpha():
         code = "from numpy.random import default_rng as d_rng\nrng = d_rng(12345)\nrng.random()"
         result, _ = await async_evaluate(code, BASE_PYTHON_TOOLS, state={}, authorized_imports=["numpy"])
 
+    @pytest.mark.asyncio
     async def test_additional_imports(self):
         code = "import numpy as np"
         await async_evaluate(code, authorized_imports=["numpy"], state={})
@@ -445,6 +487,7 @@ if char.isalpha():
         with pytest.raises(InterpreterError):
             await async_evaluate(code, authorized_imports=["random"], state={})
 
+    @pytest.mark.asyncio
     async def test_multiple_comparators(self):
         code = "0 <= -1 < 4 and 0 <= -5 < 4"
         result, _ = await async_evaluate(code, BASE_PYTHON_TOOLS, state={})
@@ -462,12 +505,14 @@ if char.isalpha():
         result, _ = await async_evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result
 
+    @pytest.mark.asyncio
     async def test_print_output(self):
         code = "print('Hello world!')\nprint('Ok no one cares')"
         state = {}
-        result, _ = await async_evaluate(code, BASE_PYTHON_TOOLS, state=state)
+        stdout = io.StringIO()
+        result, _ = await async_evaluate(code, BASE_PYTHON_TOOLS, state=state, stdout=stdout)
         assert result is None
-        assert state["_print_outputs"].value == "Hello world!\nOk no one cares\n"
+        assert stdout.getvalue() == "Hello world!\nOk no one cares\n"
 
         # Test print in function (state copy)
         code = """
@@ -476,8 +521,9 @@ def function():
     print("2")
 function()"""
         state = {}
-        await async_evaluate(code, {"print": print}, state=state)
-        assert state["_print_outputs"].value == "1\n2\n"
+        stdout = io.StringIO()
+        await async_evaluate(code, {"print": print}, state=state, stdout=stdout)
+        assert stdout.getvalue() == "1\n2\n"
 
         # Test print in list comprehension (state copy)
         code = """
@@ -485,15 +531,17 @@ print("1")
 def function():
     print("2")
 [function() for i in range(10)]"""
-        state = {}
-        await async_evaluate(code, {"print": print, "range": range}, state=state)
-        assert state["_print_outputs"].value == "1\n2\n2\n2\n2\n2\n2\n2\n2\n2\n2\n"
+        stdout = io.StringIO()
+        await async_evaluate(code, {"print": print, "range": range}, state={}, stdout=stdout)
+        assert stdout.getvalue() == "1\n2\n2\n2\n2\n2\n2\n2\n2\n2\n2\n"
 
+    @pytest.mark.asyncio
     async def test_tuple_target_in_iterator(self):
         code = "for a, b in [('Ralf Weikert', 'Austria'), ('Samuel Seungwon Lee', 'South Korea')]:res = a.split()[0]"
         result, _ = await async_evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert result == "Samuel"
 
+    @pytest.mark.asyncio
     async def test_classes(self):
         code = """
 class Animal:
@@ -576,6 +624,7 @@ cat_str = str(cat)
         assert state["num_animals"] == 3
         assert state["exception_message"] == "An error occurred"
 
+    @pytest.mark.asyncio
     async def test_variable_args(self):
         code = """
 def var_args_method(self, *args, **kwargs):
@@ -587,6 +636,7 @@ var_args_method(1, 2, 3, x=4, y=5)
         result, _ = await async_evaluate(code, {"sum": sum}, state=state)
         assert result == 15
 
+    @pytest.mark.asyncio
     async def test_exceptions(self):
         code = """
 def method_that_raises(self):
@@ -605,18 +655,22 @@ except ValueError as e:
         )
         assert state["exception_message"] == "An error occurred"
 
+    @pytest.mark.asyncio
     async def test_print(self):
         code = "print(min([1, 2, 3]))"
         state = {}
-        await async_evaluate(code, {"min": min, "print": print}, state=state)
-        assert state["_print_outputs"].value == "1\n"
+        stdout = io.StringIO()
+        await async_evaluate(code, {"min": min, "print": print}, state=state, stdout=stdout)
+        assert stdout.getvalue() == "1\n"
 
+    @pytest.mark.asyncio
     async def test_types_as_objects(self):
         code = "type_a = float(2); type_b = str; type_c = int"
         state = {}
         result, is_final_answer = await async_evaluate(code, {"float": float, "str": str, "int": int}, state=state)
         assert result is int
 
+    @pytest.mark.asyncio
     async def test_tuple_id(self):
         code = """
 food_items = {"apple": 2, "banana": 3, "orange": 1, "pear": 1}
@@ -626,6 +680,7 @@ unique_food_items = [item for item, count in food_items.items() if count == 1]
         result, is_final_answer = await async_evaluate(code, {}, state=state)
         assert result == ["orange", "pear"]
 
+    @pytest.mark.asyncio
     async def test_nonsimple_augassign(self):
         code = """
 counts_dict = {'a': 0}
@@ -645,6 +700,7 @@ a.count += 1
         assert state["counts_list"] == [1, 2, 3, 4, 5, 6]
         assert state["a"].count == 1
 
+    @pytest.mark.asyncio
     async def test_adding_int_to_list_raises_error(self):
         code = """
 counts = [1, 2, 3]
@@ -653,6 +709,7 @@ counts += 1"""
             await async_evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert "Cannot add non-list value 1 to a list." in str(e)
 
+    @pytest.mark.asyncio
     async def test_error_highlights_correct_line_of_code(self):
         code = """a = 1
 b = 2
@@ -664,6 +721,7 @@ b += 1"""
             await async_evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert "Code execution failed at line 'counts += 1" in str(e)
 
+    @pytest.mark.asyncio
     async def test_error_type_returned_in_function_call(self):
         code = """def error_function():
     raise ValueError("error")
@@ -674,6 +732,7 @@ error_function()"""
         assert "error" in str(e)
         assert "ValueError" in str(e)
 
+    @pytest.mark.asyncio
     async def test_assert(self):
         code = """
 assert 1 == 1
@@ -683,6 +742,7 @@ assert 1 == 2
             await async_evaluate(code, BASE_PYTHON_TOOLS, state={})
         assert "1 == 2" in str(e) and "1 == 1" not in str(e)
 
+    @pytest.mark.asyncio
     async def test_with_context_manager(self):
         code = """
 class SimpleLock:
@@ -707,6 +767,7 @@ assert lock.locked == False
         tools = {}
         await async_evaluate(code, tools, state=state)
 
+    @pytest.mark.asyncio
     async def test_default_arg_in_function(self):
         code = """
 def f(a, b=333, n=1000):
@@ -717,6 +778,7 @@ n = f(1, n=667)
         assert res == 1000
         assert not is_final_answer
 
+    @pytest.mark.asyncio
     async def test_set(self):
         code = """
 S1 = {'a', 'b', 'c'}
@@ -729,6 +791,7 @@ S4 = S1.intersection(S2)
         assert state["S3"] == {"a"}
         assert state["S4"] == {"b", "c"}
 
+    @pytest.mark.asyncio
     async def test_break(self):
         code = """
 i = 0
@@ -743,6 +806,7 @@ i"""
         assert result == 3
         assert not is_final_answer
 
+    @pytest.mark.asyncio
     async def test_return(self):
         # test early returns
         code = """
@@ -772,6 +836,7 @@ returns_none(1)
         )
         assert result is None
 
+    @pytest.mark.asyncio
     async def test_nested_for_loop(self):
         code = """
 all_res = []
@@ -788,6 +853,7 @@ out[:10]
         result, is_final_answer = await async_evaluate(code, {"print": print, "range": range}, state=state)
         assert result == [0, 0, 1, 0, 1, 2, 0, 1, 2, 3]
 
+    @pytest.mark.asyncio
     async def test_pandas(self):
         code = """
 import pandas as pd
@@ -839,6 +905,7 @@ survival_rate_sorted = data.sort_values(by='Survived', ascending=False).iloc[0]
 """
         result, _ = await async_evaluate(code, {}, state={}, authorized_imports=["pandas"])
 
+    @pytest.mark.asyncio
     async def test_starred(self):
         code = """
 from math import radians, sin, cos, sqrt, atan2
@@ -861,6 +928,7 @@ distance_geneva_barcelona = haversine(*coords_geneva, *coords_barcelona)
         result, _ = await async_evaluate(code, {"print": print, "map": map}, state={}, authorized_imports=["math"])
         assert round(result, 1) == 622395.4
 
+    @pytest.mark.asyncio
     async def test_for(self):
         code = """
 shifts = {
@@ -876,6 +944,7 @@ shift_intervals
         result, _ = await async_evaluate(code, {"print": print, "map": map}, state={})
         assert result == {"Worker A": "8:00 pm", "Worker B": "11:45 am"}
 
+    @pytest.mark.asyncio
     async def test_syntax_error_points_error(self):
         code = "a = ;"
         with pytest.raises(InterpreterError) as e:
@@ -883,6 +952,7 @@ shift_intervals
         assert "SyntaxError" in str(e)
         assert "     ^" in str(e)
 
+    @pytest.mark.asyncio
     async def test_fix_final_answer_code(self):
         test_cases = [
             (
@@ -912,7 +982,7 @@ shift_intervals
         ]
 
         for i, (input_code, expected) in enumerate(test_cases, 1):
-            result = await fix_final_answer_code(input_code)
+            result = fix_final_answer_code(input_code)
             assert result == expected, f"""
     Test case {i} failed:
     Input:    {input_code}
@@ -920,6 +990,7 @@ shift_intervals
     Got:      {result}
     """
 
+    @pytest.mark.asyncio
     async def test_dangerous_subpackage_access_blocked(self):
         # Direct imports with dangerous patterns should fail
         code = "import random._os"
@@ -936,12 +1007,14 @@ shift_intervals
         with pytest.raises(InterpreterError):
             await async_evaluate(code, authorized_imports=["doctest"])
 
+    @pytest.mark.asyncio
     async def test_close_matches_subscript(self):
         code = 'capitals = {"Czech Republic": "Prague", "Monaco": "Monaco", "Bhutan": "Thimphu"};capitals["Butan"]'
         with pytest.raises(Exception) as e:
             await async_evaluate(code)
         assert "KeyError: 'Butan'" in str(e).replace("\\", "")
 
+    @pytest.mark.asyncio
     async def test_dangerous_builtins_calls_are_blocked(self):
         unsafe_code = "import os"
         dangerous_code = f"""
@@ -956,6 +1029,7 @@ exec(compile('{unsafe_code}', 'no filename', 'exec'))
         with pytest.raises(InterpreterError):
             await async_evaluate(dangerous_code, static_tools=BASE_PYTHON_TOOLS)
 
+    @pytest.mark.asyncio
     async def test_dangerous_builtins_are_callable_if_explicitly_added(self):
         dangerous_code = """
 compile = callable.__self__.compile
@@ -973,10 +1047,12 @@ texec(tcompile("1 + 1", "no filename", "exec"))
             dangerous_code, static_tools={"tcompile": compile, "teval": eval, "texec": exec} | BASE_PYTHON_TOOLS
         )
 
+    @pytest.mark.asyncio
     async def test_can_import_os_if_explicitly_authorized(self):
         dangerous_code = "import os; os.listdir('./')"
         await async_evaluate(dangerous_code, authorized_imports=["os"])
 
+    @pytest.mark.asyncio
     async def test_can_import_os_if_all_imports_authorized(self):
         dangerous_code = "import os; os.listdir('./')"
         await async_evaluate(dangerous_code, authorized_imports=["*"])
@@ -1341,43 +1417,6 @@ async def test_non_standard_comparisons():
     assert str(result) == "a == b"
 
 
-class TestPrintContainer:
-    @pytest.mark.asyncio
-    async def test_initial_value(self):
-        pc = PrintContainer()
-        assert pc.value == ""
-
-    @pytest.mark.asyncio
-    async def test_append(self):
-        pc = PrintContainer()
-        pc.append("Hello")
-        assert pc.value == "Hello"
-
-    @pytest.mark.asyncio
-    async def test_iadd(self):
-        pc = PrintContainer()
-        pc += "World"
-        assert pc.value == "World"
-
-    @pytest.mark.asyncio
-    async def test_str(self):
-        pc = PrintContainer()
-        pc.append("Hello")
-        assert str(pc) == "Hello"
-
-    @pytest.mark.asyncio
-    async def test_repr(self):
-        pc = PrintContainer()
-        pc.append("Hello")
-        assert repr(pc) == "PrintContainer(Hello)"
-
-    @pytest.mark.asyncio
-    async def test_len(self):
-        pc = PrintContainer()
-        pc.append("Hello")
-        assert len(pc) == 5
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "module,authorized_imports,expected",
@@ -1484,3 +1523,13 @@ async def test_await():
         """)
     result, _ = await async_evaluate(code, {}, {})
     assert result == 0
+
+@pytest.mark.asyncio
+async def test_contemplation():
+    code = dedent("""\
+        foo = [1, 2, 3]
+        [a+1 for a in foo]
+        """)
+    result, _ = await async_evaluate(code, {}, {})
+    assert result == [2, 3, 4]
+
