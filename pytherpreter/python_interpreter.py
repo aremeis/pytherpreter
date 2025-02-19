@@ -86,21 +86,7 @@ BASE_BUILTIN_FUNCTIONS = {
     "dict": dict,
     "tuple": tuple,
     "round": round,
-    "ceil": math.ceil,
-    "floor": math.floor,
-    "log": math.log,
-    "exp": math.exp,
-    "sin": math.sin,
-    "cos": math.cos,
-    "tan": math.tan,
-    "asin": math.asin,
-    "acos": math.acos,
-    "atan": math.atan,
-    "atan2": math.atan2,
-    "degrees": math.degrees,
-    "radians": math.radians,
     "pow": pow,
-    "sqrt": math.sqrt,
     "len": len,
     "sum": sum,
     "max": max,
@@ -149,34 +135,6 @@ def get_iterable(obj):
         return list(obj)
     else:
         raise InterpreterError("Object is not iterable")
-
-
-def fix_final_answer_code(code: str) -> str:
-    """
-    Sometimes an LLM can try to assign a variable to final_answer, which would break the final_answer() tool.
-    This function fixes this behaviour by replacing variable assignments to final_answer with final_answer_variable,
-    while preserving function calls to final_answer().
-    """
-    # First, find if there's a direct assignment to final_answer
-    # Use word boundary and negative lookbehind to ensure it's not an object attribute
-    assignment_pattern = r"(?<!\.)(?<!\w)\bfinal_answer\s*="
-    if "final_answer(" not in code or not re.search(assignment_pattern, code):
-        # If final_answer tool is not called in this blob, then doing the replacement is hazardous because it could false the model's memory for next steps.
-        # Let's not modify the code and leave the subsequent assignment error happen.
-        return code
-
-    # Pattern for replacing variable assignments
-    # Looks for 'final_answer' followed by '=' with optional whitespace
-    # Negative lookbehind ensures we don't match object attributes
-    assignment_regex = r"(?<!\.)(?<!\w)(\bfinal_answer)(\s*=)"
-    code = re.sub(assignment_regex, r"final_answer_variable\2", code)
-
-    # Pattern for replacing variable usage but not function calls
-    # Negative lookahead (?!\s*\() ensures we don't match function calls
-    # Negative lookbehind (?<!\.|\w) ensures we don't match object methods or other variables
-    variable_regex = r"(?<!\.)(?<!\w)(\bfinal_answer\b)(?!\s*\()"
-    code = re.sub(variable_regex, "final_answer_variable", code)
-    return code
 
 
 def evaluate_unaryop(
@@ -523,7 +481,7 @@ def set_value(
 ) -> None:
     if isinstance(target, ast.Name):
         if target.id in static_tools:
-            raise InterpreterError(f"Cannot assign to name '{target.id}': doing this would erase the existing tool!")
+            raise InterpreterError(f"Cannot assign to name '{target.id}': doing this would erase the existing function!")
         state[target.id] = value
     elif isinstance(target, ast.Tuple):
         if not isinstance(value, tuple):
@@ -589,7 +547,7 @@ def evaluate_call(
             and (func not in static_tools.values())
         ):
             raise InterpreterError(
-                f"Invoking a builtin function that has not been explicitly added as a tool is not allowed ({func_name})."
+                f"Invoking a builtin function that has not been explicitly added is not allowed ({func_name})."
             )
         return func(*args, **kwargs)
 
@@ -1285,6 +1243,10 @@ def evaluate(
 
 
 class PythonInterpreter:
+    """
+    A class that allows you to evaluate python code with safeguards. This class is a wrapper around the `evaluate` function.
+    It will keep track of the state between calls.
+    """
     def __init__(
         self,
         additional_authorized_imports: Optional[Iterable[str]] = [],
@@ -1292,6 +1254,20 @@ class PythonInterpreter:
         initial_variables: Optional[Dict[str, Any]] = {},
         stdout: Optional[TextIO] = sys.stdout,
     ):
+        """
+        Initialize the PythonInterpreter class.
+
+        Args:
+            additional_authorized_imports (Iterable[str]): 
+                Additional authorized imports.
+            additional_functions (Dict[str, Callable]): 
+                Additional functions.
+            initial_variables (Dict[str, Any]): 
+                Initial variables.
+            stdout (TextIO): 
+                The stream to be used for print outputs. If None, the print function will be a no-op. 
+                Defaults to sys.stdout.
+        """
         self.variables = initial_variables or {}
         self.stdout = stdout
         self.authorized_imports = list(set(BASE_BUILTIN_MODULES) | set(additional_authorized_imports))
@@ -1304,6 +1280,16 @@ class PythonInterpreter:
         # TODO: assert self.authorized imports are all installed locally
 
     def __call__(self, code: str, additional_variables: Dict = {}) -> Tuple[Any, str, bool]:
+        """
+        Evaluate the code and return the result.
+
+        Args:
+            code (str): The code to evaluate.
+            additional_variables (Dict): Additional variables to add to the state. Defaults to an empty dictionary.
+
+        Returns:
+            The result of the last evaluated expression in the code.
+        """
         self.variables.update(additional_variables)
         output = evaluate(
             code,

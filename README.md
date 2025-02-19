@@ -20,11 +20,12 @@ A Python interpreter with built-in safeguards for executing untrusted code, like
 This repository contains the Python interpreter tool extracted from HuggingFace’s [_smolagents_](https://github.com/huggingface/smolagents) project.
 Big hug to the HuggingFace team for their initial implementation! 🤗
 
-Some improvements over smolagents:
+Some improvements over the smolagents tool:
 - Supports async code execution using the `async_evaluate` function and `AsyncPythonInterpreter` class.
 - Improved function call resolution.
 - Supports custom subscriptable objects.
 - No external dependencies.
+- More flexible `print` handling.
 
 ## Installation
 ```shell
@@ -51,33 +52,17 @@ This function evaluates Python code and returns the result.
 ```python
 from pytherpreter import evaluate
 
-result, final_answer = evaluate("""
+result = evaluate("""
 from math import sqrt
 sqrt(4)
 """)
 print(result)
-print(final_answer)
 
 # Output:
 # 2.0
-# False
 ```
 
-By default, the `evaluate` function will return the result of the last expression in the code.
-However, you can also return a value from the code by using the `final_answer` function:
-
-```python
-result, final_answer = evaluate_python_code("""
-from math import sqrt
-final_answer(sqrt(4))
-""")
-print(result)
-print(final_answer)
-
-# Output:
-# 2.0
-# True
-```
+The `evaluate` function returns the result of the last expression in the code.
 
 ### Using `PythonInterpreter`
 
@@ -88,30 +73,66 @@ Variables and functions defined by the code will be be available in subsequent c
 from pytherpreter import PythonInterpreter
 
 interpreter = PythonInterpreter()
-result, logs, is_final_answer = interpreter("x = 3")
+result = interpreter("x = 3")
 print(result)
-print(logs)
-print(is_final_answer)
 
 # Output:
 # 3
-# 
-# False
 
-result, logs, is_final_answer = interpreter("""
-x += 1
-print('x =', x)
-final_answer(x);
-""")
+result = interpreter("x += 1")
 print(result)
-print(logs)
-print(is_final_answer)
 
 # Output:
 # 4
-# x = 4
-# True
 ```
+
+### Printing
+
+You may provide a `stdout` argument to capture the output of print statements in the code.
+
+```python
+from pytherpreter import evaluate
+import io
+stdout = io.StringIO()
+result = evaluate("print('Hello, World!')", stdout=stdout)
+print(stdout.getvalue())
+
+# Output:
+# Hello, World!
+```
+
+### Variables
+
+You may provide a `variables` argument to preset variables and capture changes to them.
+
+```python
+from pytherpreter import evaluate
+variables = {"x": 3}
+result = evaluate("x += 1", variables=variables)
+print(variables["x"])
+
+# Output:
+# 4
+```
+
+## Safeguards
+
+### Built-in functions
+
+You may provide a `builtin_functions` argument containing a dictionary of built-in functions the code is allowed to call.
+If you don't provide this argument, the code will only be able to call the built-in functions in `BASE_BUILTIN_FUNCTIONS`.
+
+The code will not be able to modify the provided built-in functions.
+
+### Modules
+
+By default, the code will only be able to import the modules in `BASE_BUILTIN_MODULES`.
+You may provide an `authorized_imports` argument to allow the code to import additional modules.
+
+
+## Documentation
+
+For more details, the reference documentation is available [here](documentation.md).
 
 ## License
 This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.

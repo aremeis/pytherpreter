@@ -33,7 +33,6 @@ from pytherpreter.python_interpreter import (
     evaluate_condition,
     evaluate_delete,
     evaluate,
-    fix_final_answer_code,
     get_safe_module,
 )
 
@@ -73,7 +72,7 @@ class PythonInterpreterTester(unittest.TestCase):
         code = "print = '3'"
         with pytest.raises(InterpreterError) as e:
             evaluate(code, {"print": print}, variables={})
-        assert "Cannot assign to name 'print': doing this would erase the existing tool!" in str(e)
+        assert "Cannot assign to name 'print': doing this would erase the existing function!" in str(e)
 
     def test_subscript_call(self):
         code = """def foo(x,y):return x*y\n\ndef boo(y):\n\treturn y**3\nfun = [foo, boo]\nresult_foo = fun[0](4,2)\nresult_boo = fun[1](4)"""
@@ -890,43 +889,6 @@ shift_intervals
         assert "SyntaxError" in str(e)
         assert "     ^" in str(e)
 
-    def test_fix_final_answer_code(self):
-        test_cases = [
-            (
-                "final_answer = 3.21\nfinal_answer(final_answer)",
-                "final_answer_variable = 3.21\nfinal_answer(final_answer_variable)",
-            ),
-            (
-                "x = final_answer(5)\nfinal_answer = x + 1\nfinal_answer(final_answer)",
-                "x = final_answer(5)\nfinal_answer_variable = x + 1\nfinal_answer(final_answer_variable)",
-            ),
-            (
-                "def func():\n    final_answer = 42\n    return final_answer(final_answer)",
-                "def func():\n    final_answer_variable = 42\n    return final_answer(final_answer_variable)",
-            ),
-            (
-                "final_answer(5)  # Should not change function calls",
-                "final_answer(5)  # Should not change function calls",
-            ),
-            (
-                "obj.final_answer = 5  # Should not change object attributes",
-                "obj.final_answer = 5  # Should not change object attributes",
-            ),
-            (
-                "final_answer=3.21;final_answer(final_answer)",
-                "final_answer_variable=3.21;final_answer(final_answer_variable)",
-            ),
-        ]
-
-        for i, (input_code, expected) in enumerate(test_cases, 1):
-            result = fix_final_answer_code(input_code)
-            assert result == expected, f"""
-    Test case {i} failed:
-    Input:    {input_code}
-    Expected: {expected}
-    Got:      {result}
-    """
-
     def test_dangerous_subpackage_access_blocked(self):
         # Direct imports with dangerous patterns should fail
         code = "import random._os"
@@ -1459,3 +1421,12 @@ def test_python_interpreter():
 #     value = evaluate(code, {})
 #     assert value == "bar"
 
+def test_foo():
+    code = dedent("""\
+        import math
+        math.gcd(14, 21)
+        """)
+    # import math
+    # math.gcd(1, 2)
+    value = evaluate(code, {})
+    assert value == 7

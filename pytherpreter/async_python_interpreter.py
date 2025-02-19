@@ -377,7 +377,7 @@ async def set_value(
 ) -> None:
     if isinstance(target, ast.Name):
         if target.id in static_tools:
-            raise InterpreterError(f"Cannot assign to name '{target.id}': doing this would erase the existing tool!")
+            raise InterpreterError(f"Cannot assign to name '{target.id}': doing this would erase the existing function!")
         state[target.id] = value
     elif isinstance(target, ast.Tuple):
         if not isinstance(value, tuple):
@@ -443,7 +443,7 @@ async def evaluate_call(
             and (func not in static_tools.values())
         ):
             raise InterpreterError(
-                f"Invoking a builtin function that has not been explicitly added as a tool is not allowed ({func_name})."
+                f"Invoking a builtin function that has not been explicitly added is not allowed ({func_name})."
             )
         return func(*args, **kwargs)
 
@@ -1058,6 +1058,10 @@ async def async_evaluate(
 
 
 class AsyncPythonInterpreter:
+    """
+    A class that allows you to asynchronously evaluate python code with safeguards. This class is a wrapper 
+    around the `async_evaluate` function. It will keep track of the state between calls.
+    """
     def __init__(
         self,
         additional_authorized_imports: Optional[Iterable[str]] = [],
@@ -1065,6 +1069,20 @@ class AsyncPythonInterpreter:
         initial_variables: Optional[Dict[str, Any]] = {},
         stdout: Optional[TextIO] = sys.stdout,
     ):
+        """
+        Initialize the PythonInterpreter class.
+
+        Args:
+            additional_authorized_imports (Iterable[str]): 
+                Additional authorized imports.
+            additional_functions (Dict[str, Callable]): 
+                Additional functions.
+            initial_variables (Dict[str, Any]): 
+                Initial variables.
+            stdout (TextIO): 
+                The stream to be used for print outputs. If None, the print function will be a no-op. 
+                Defaults to sys.stdout.
+        """
         self.variables = initial_variables or {}
         self.stdout = stdout
         self.authorized_imports = list(set(BASE_BUILTIN_MODULES) | set(additional_authorized_imports))

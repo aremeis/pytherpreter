@@ -29,7 +29,6 @@ from pytherpreter.python_interpreter import (
     ClientError,
     InterpreterError,
     check_module_authorized,
-    fix_final_answer_code,
     get_safe_module,
 )
 from pytherpreter.async_python_interpreter import (
@@ -84,7 +83,7 @@ class TestAsyncPythonInterpreter():
         code = "print = '3'"
         with pytest.raises(InterpreterError) as e:
             await async_evaluate(code, {"print": print}, variables={})
-        assert "Cannot assign to name 'print': doing this would erase the existing tool!" in str(e)
+        assert "Cannot assign to name 'print': doing this would erase the existing function!" in str(e)
 
     @pytest.mark.asyncio
     async def test_subscript_call(self):
@@ -951,44 +950,6 @@ shift_intervals
             await async_evaluate(code)
         assert "SyntaxError" in str(e)
         assert "     ^" in str(e)
-
-    @pytest.mark.asyncio
-    async def test_fix_final_answer_code(self):
-        test_cases = [
-            (
-                "final_answer = 3.21\nfinal_answer(final_answer)",
-                "final_answer_variable = 3.21\nfinal_answer(final_answer_variable)",
-            ),
-            (
-                "x = final_answer(5)\nfinal_answer = x + 1\nfinal_answer(final_answer)",
-                "x = final_answer(5)\nfinal_answer_variable = x + 1\nfinal_answer(final_answer_variable)",
-            ),
-            (
-                "def func():\n    final_answer = 42\n    return final_answer(final_answer)",
-                "def func():\n    final_answer_variable = 42\n    return final_answer(final_answer_variable)",
-            ),
-            (
-                "final_answer(5)  # Should not change function calls",
-                "final_answer(5)  # Should not change function calls",
-            ),
-            (
-                "obj.final_answer = 5  # Should not change object attributes",
-                "obj.final_answer = 5  # Should not change object attributes",
-            ),
-            (
-                "final_answer=3.21;final_answer(final_answer)",
-                "final_answer_variable=3.21;final_answer(final_answer_variable)",
-            ),
-        ]
-
-        for i, (input_code, expected) in enumerate(test_cases, 1):
-            result = fix_final_answer_code(input_code)
-            assert result == expected, f"""
-    Test case {i} failed:
-    Input:    {input_code}
-    Expected: {expected}
-    Got:      {result}
-    """
 
     @pytest.mark.asyncio
     async def test_dangerous_subpackage_access_blocked(self):
