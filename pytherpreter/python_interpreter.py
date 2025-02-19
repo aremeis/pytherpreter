@@ -18,7 +18,6 @@
 
 import ast
 import builtins
-import difflib
 import inspect
 import logging
 import math
@@ -662,9 +661,6 @@ def evaluate_name(
         return custom_tools[name.id]
     elif name.id in ERRORS:
         return ERRORS[name.id]
-    close_matches = difflib.get_close_matches(name.id, list(state.keys()))
-    if len(close_matches) > 0:
-        return state[close_matches[0]]
     raise InterpreterError(f"The name `{name.id}` is not defined.")
 
 

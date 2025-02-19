@@ -622,7 +622,7 @@ except ValueError as e:
     def test_tuple_id(self):
         code = """
 food_items = {"apple": 2, "banana": 3, "orange": 1, "pear": 1}
-unique_food_items = [item for item, count in food_item_counts.items() if count == 1]
+unique_food_items = [item for item, count in food_items.items() if count == 1]
 """
         state = {}
         result, is_final_answer = evaluate(code, {}, state=state)
@@ -1431,8 +1431,13 @@ def test_custom_subscriptable():
     assert result == "b"
 
 def test_not_callable_error():
-    code = dedent("'foo'()")
+    code = "'foo'()"
     with pytest.raises(InterpreterError) as e:
         evaluate(code)
     assert "'str' object is not callable" in str(e.value)
 
+def test_similar_names():
+    code = "fo"
+    with pytest.raises(InterpreterError) as e:  
+        evaluate(code, {}, {}, { "foo": "bar" })
+    assert "The name `fo` is not defined." in str(e.value)

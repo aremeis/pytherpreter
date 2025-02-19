@@ -620,7 +620,7 @@ except ValueError as e:
     async def test_tuple_id(self):
         code = """
 food_items = {"apple": 2, "banana": 3, "orange": 1, "pear": 1}
-unique_food_items = [item for item, count in food_item_counts.items() if count == 1]
+unique_food_items = [item for item, count in food_items.items() if count == 1]
 """
         state = {}
         result, is_final_answer = await async_evaluate(code, {}, state=state)
@@ -1465,6 +1465,13 @@ async def test_not_callable_error():
         await async_evaluate(code)
     assert "'str' object is not callable" in str(e.value)
 
+
+@pytest.mark.asyncio
+async def test_similar_names():
+    code = "fo"
+    with pytest.raises(InterpreterError) as e:  
+        await async_evaluate(code, {}, {}, { "foo": "bar" })
+    assert "The name `fo` is not defined." in str(e.value)
 
 @pytest.mark.asyncio
 async def test_await():
