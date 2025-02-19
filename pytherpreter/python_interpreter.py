@@ -25,7 +25,7 @@ import re
 from importlib import import_module
 import sys
 from types import ModuleType
-from typing import Any, Callable, Dict, List, Optional, Tuple, TextIO
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, TextIO
 
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ MAX_OPERATIONS = 10000000
 MAX_WHILE_ITERATIONS = 1000000
 
 
-BASE_PYTHON_TOOLS = {
+BASE_BUILTIN_FUNCTIONS = {
     "isinstance": isinstance,
     "range": range,
     "float": float,
@@ -1210,9 +1210,9 @@ def evaluate_ast(
 
 def evaluate(
     code: str,
-    static_tools: Optional[Dict[str, Callable]] = None,
-    custom_tools: Optional[Dict[str, Callable]] = None,
-    state: Optional[Dict[str, Any]] = None,
+    builtin_functions: Optional[Dict[str, Callable]] = BASE_BUILTIN_FUNCTIONS,
+    custom_functions: Optional[Dict[str, Callable]] = None,
+    variables: Optional[Dict[str, Any]] = None,
     authorized_imports: List[str] = BASE_BUILTIN_MODULES,
     stdout: Optional[TextIO] = sys.stdout,
 ):
@@ -1223,17 +1223,23 @@ def evaluate(
     Args:
         code (`str`):
             The code to evaluate.
-        static_tools (`Dict[str, Callable]`):
-            The functions that may be called during the evaluation. These can also be agents in a multiagent setting.
-            These tools cannot be overwritten in the code: any assignment to their name will raise an error.
-        custom_tools (`Dict[str, Callable]`):
-            The functions that may be called during the evaluation.
-            These tools can be overwritten in the code: any assignment to their name will overwrite them.
-        state (`Dict[str, Any]`):
-            A dictionary mapping variable names to values. The `state` should contain the initial inputs but will be
+        builtin_functions (`Dict[str, Callable]`):
+            The built-in functions that may be called during the evaluation. 
+            These functions cannot be overwritten in the code: any assignment to their name will raise an error.
+            Defaults to BASE_BUILTIN_FUNCTIONS.
+        custom_functions (`Dict[str, Callable]`):
+            The custom functions that may be called during the evaluation.
+            These functions can be overwritten in the code: any assignment to their name will overwrite them.
+        variables (`Dict[str, Any]`):
+            A dictionary mapping variable names to values. The `variables` should contain the initial inputs but will be
             updated by this function to contain all variables as they are evaluated.
+        authorized_imports (`List[str]`):
+            The list of modules that can be imported by the code. Defaults to BASE_BUILTIN_MODULES.
         stdout (`TextIO`):
             The stream to be used for print outputs. If None, the print function will be a no-op. Defaults to sys.stdout.
+            
+    Returns:
+        The result of the last evaluated expression in the code.
     """
     try:
         expression = ast.parse(code)
@@ -1245,8 +1251,8 @@ def evaluate(
             f"Error: {str(e)}"
         )
 
-    if state is None:
-        state = {}
+    if variables is None:
+        variables = {}
 
     def get_print_function(stdout: Optional[TextIO]):
         """Generate a print function that writes to `stdout` by default."""
@@ -1258,14 +1264,15 @@ def evaluate(
             return print(*args, **kwargs)
         return print_function
     
-    static_tools = static_tools.copy() if static_tools is not None else {}
-    static_tools["print"] = get_print_function(stdout)
-    custom_tools = custom_tools if custom_tools is not None else {}
+    builtin_functions = builtin_functions.copy() if builtin_functions is not None else {}
+    if "print" not in builtin_functions:
+        builtin_functions["print"] = get_print_function(stdout)
+    custom_functions = custom_functions if custom_functions is not None else {}
     result = None
 
     try:
         for node in expression.body:
-            result = evaluate_ast(node, state, static_tools, custom_tools, authorized_imports)
+            result = evaluate_ast(node, variables, builtin_functions, custom_functions, authorized_imports)
         return result
     except ClientError as e:
         raise e
@@ -1280,38 +1287,33 @@ def evaluate(
 class PythonInterpreter:
     def __init__(
         self,
-        additional_authorized_imports: List[str] = None,
-        tools: Dict = None,
-        max_print_outputs_length: Optional[int] = None,
+        additional_authorized_imports: Optional[Iterable[str]] = [],
+        additional_functions: Optional[Dict[str, Callable]] = {},
+        initial_variables: Optional[Dict[str, Any]] = {},
+        stdout: Optional[TextIO] = sys.stdout,
     ):
-        additional_authorized_imports = additional_authorized_imports or []
-        tools = tools or {}
-        self.custom_tools = {}
-        self.state = {}
-        self.max_print_outputs_length = max_print_outputs_length
-        if max_print_outputs_length is None:
-            self.max_print_outputs_length = DEFAULT_MAX_LEN_OUTPUT
-        self.additional_authorized_imports = additional_authorized_imports
-        self.authorized_imports = list(set(BASE_BUILTIN_MODULES) | set(self.additional_authorized_imports))
-        # Add base trusted tools to list
-        self.static_tools = {
-            **tools,
-            **BASE_PYTHON_TOOLS.copy(),
+        self.variables = initial_variables or {}
+        self.stdout = stdout
+        self.authorized_imports = list(set(BASE_BUILTIN_MODULES) | set(additional_authorized_imports))
+        # Add base trusted functions to list
+        self.all_functions = {
+            **BASE_BUILTIN_FUNCTIONS,
+            **additional_functions,
         }
+        self.custom_functions = {}
         # TODO: assert self.authorized imports are all installed locally
 
-    def __call__(self, code_action: str, additional_variables: Dict = {}) -> Tuple[Any, str, bool]:
-        self.state.update(additional_variables)
-        output, is_final_answer = evaluate(
-            code_action,
-            static_tools=self.static_tools,
-            custom_tools=self.custom_tools,
-            state=self.state,
+    def __call__(self, code: str, additional_variables: Dict = {}) -> Tuple[Any, str, bool]:
+        self.variables.update(additional_variables)
+        output = evaluate(
+            code,
+            builtin_functions=self.all_functions,
+            custom_functions=self.custom_functions,
+            variables=self.variables,
             authorized_imports=self.authorized_imports,
-            max_print_outputs_length=self.max_print_outputs_length,
+            stdout=self.stdout,
         )
-        logs = None
-        return output, logs, is_final_answer
+        return output
 
 
-__all__ = ["evaluate", "PythonInterpreter", "ClientError", "BASE_PYTHON_TOOLS", "MAX_OPERATIONS", "MAX_WHILE_ITERATIONS"]
+__all__ = ["evaluate", "PythonInterpreter", "ClientError", "BASE_BUILTIN_FUNCTIONS", "MAX_OPERATIONS", "MAX_WHILE_ITERATIONS"]
