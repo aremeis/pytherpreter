@@ -37,6 +37,7 @@ from .python_interpreter import (
     evaluate_lambda, 
     evaluate_function_def,
     evaluate_name,
+    evaluate_generatorexp,
     check_module_authorized,
     import_modules,
 )
@@ -557,6 +558,44 @@ async def evaluate_for(
     return result
 
 
+async def evaluate_async_for(
+    async_for_loop: ast.AsyncFor,
+    state: Dict[str, Any],
+    static_tools: Dict[str, Callable],
+    custom_tools: Dict[str, Callable],
+    authorized_imports: List[str],
+) -> Any:
+    """
+    Evaluate an async for loop.
+    
+    This function handles the evaluation of async for loops, allowing iteration over async iterables.
+    """
+    result = None
+    iterator = await evaluate_ast(async_for_loop.iter, state, static_tools, custom_tools, authorized_imports)
+    async for counter in iterator:
+        await set_value(
+            async_for_loop.target,
+            counter,
+            state,
+            static_tools,
+            custom_tools,
+            authorized_imports,
+        )
+        for node in async_for_loop.body:
+            try:
+                line_result = await evaluate_ast(node, state, static_tools, custom_tools, authorized_imports)
+                if line_result is not None:
+                    result = line_result
+            except BreakException:
+                break 
+            except ContinueException:
+                continue
+        else:
+            continue
+        break
+    return result
+
+
 async def evaluate_listcomp(
     listcomp: ast.ListComp,
     state: Dict[str, Any],
@@ -879,8 +918,10 @@ async def evaluate_ast(
         return expression.value
     elif isinstance(expression, ast.Tuple):
         return tuple([await evaluate_ast(elt, *common_params) for elt in expression.elts])
-    elif isinstance(expression, (ast.ListComp, ast.GeneratorExp)):
+    elif isinstance(expression, ast.ListComp):
         return await evaluate_listcomp(expression, *common_params)
+    elif isinstance(expression, ast.GeneratorExp):
+        return evaluate_generatorexp(expression, *common_params)
     elif isinstance(expression, ast.UnaryOp):
         return await evaluate_unaryop(expression, *common_params)
     elif isinstance(expression, ast.Starred):
@@ -919,6 +960,9 @@ async def evaluate_ast(
     elif isinstance(expression, ast.For):
         # For loop -> execute the loop
         return await evaluate_for(expression, *common_params)
+    elif isinstance(expression, ast.AsyncFor):
+        # AsyncFor loop -> execute the async loop
+        return await evaluate_async_for(expression, *common_params)
     elif isinstance(expression, ast.FormattedValue):
         # Formatted value (part of f-string) -> evaluate the content and return
         return await evaluate_ast(expression.value, *common_params)
@@ -1066,7 +1110,7 @@ class AsyncPythonInterpreter:
         self,
         additional_authorized_imports: Optional[Iterable[str]] = [],
         additional_functions: Optional[Dict[str, Callable]] = {},
-        initial_variables: Optional[Dict[str, Any]] = {},
+        initial_variables: Optional[Dict[str, Any]] = None,
         stdout: Optional[TextIO] = sys.stdout,
     ):
         """

@@ -723,6 +723,63 @@ def evaluate_listcomp(
     return inner_evaluate(listcomp.generators, 0, state)
 
 
+def evaluate_generatorexp(
+    expression: ast.GeneratorExp,
+    state: Dict[str, Any],
+    static_tools: Dict[str, Callable],
+    custom_tools: Dict[str, Callable],
+    authorized_imports: List[str],
+) -> Any:
+    elt = expression.elt
+    generators = expression.generators
+    
+    def generator():
+        # Create a new state for the generator to avoid variable leakage
+        gen_state = state.copy()
+        
+        # Evaluate the iterables first
+        iterables = []
+        for gen in generators:
+            iterable = evaluate_ast(gen.iter, gen_state, static_tools, custom_tools, authorized_imports)
+            iterables.append(iter(iterable))
+        
+        # Helper function to recursively handle nested generators
+        def generate_values(depth=0):
+            if depth == len(generators):
+                # At max depth, yield the element
+                yield evaluate_ast(elt, gen_state, static_tools, custom_tools, authorized_imports)
+                return
+            
+            gen = generators[depth]
+            iterator = iterables[depth]
+            
+            # Handle 'if' conditions in the generator
+            for value in iterator:
+                # Use set_value to handle all kinds of targets, including tuple unpacking
+                set_value(
+                    gen.target,
+                    value,
+                    gen_state,
+                    static_tools,
+                    custom_tools, 
+                    authorized_imports
+                )
+                
+                # Check if conditions
+                skip = False
+                for if_clause in gen.ifs:
+                    if not evaluate_ast(if_clause, gen_state, static_tools, custom_tools, authorized_imports):
+                        skip = True
+                        break
+                
+                if not skip:
+                    yield from generate_values(depth + 1)
+        
+        yield from generate_values()
+    
+    return generator()
+
+
 def evaluate_try(
     try_node: ast.Try,
     state: Dict[str, Any],
@@ -1069,8 +1126,10 @@ def evaluate_ast(
         return expression.value
     elif isinstance(expression, ast.Tuple):
         return tuple((evaluate_ast(elt, *common_params) for elt in expression.elts))
-    elif isinstance(expression, (ast.ListComp, ast.GeneratorExp)):
+    elif isinstance(expression, ast.ListComp):
         return evaluate_listcomp(expression, *common_params)
+    elif isinstance(expression, ast.GeneratorExp):
+        return evaluate_generatorexp(expression, *common_params)
     elif isinstance(expression, ast.UnaryOp):
         return evaluate_unaryop(expression, *common_params)
     elif isinstance(expression, ast.Starred):
@@ -1251,7 +1310,7 @@ class PythonInterpreter:
         self,
         additional_authorized_imports: Optional[Iterable[str]] = [],
         additional_functions: Optional[Dict[str, Callable]] = {},
-        initial_variables: Optional[Dict[str, Any]] = {},
+        initial_variables: Optional[Dict[str, Any]] = None,
         stdout: Optional[TextIO] = sys.stdout,
     ):
         """

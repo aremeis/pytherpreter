@@ -327,6 +327,32 @@ print(check_digits)
         assert result == [0, 1, 2]
 
     @pytest.mark.asyncio
+    async def test_generatorcomp(self):
+        # Test regular generator expression
+        code = "x = next(2 / i for i in reversed(range(3)))"
+        result = await async_evaluate(code, {"range": range, "next": next, "reversed": reversed}, variables={})
+        assert result == 1
+
+        code = "x = next(a for a, b in [(1, 2), (3, 4)] if b > 2)"
+        result = await async_evaluate(code, {"next": next}, variables={})
+        assert result == 3
+
+    @pytest.mark.asyncio
+    async def test_async_for(self):
+        # Test async generator expression
+        async def gen():
+            for i in reversed(range(3)):
+                yield i
+        code = dedent(
+            """\
+            async for i in gen():
+                x = 2 / i
+                break
+            """)
+        result = await async_evaluate(code, {"gen": gen}, variables={})
+        assert result == 1
+
+    @pytest.mark.asyncio
     async def test_break_continue(self):
         code = "for i in range(10):\n    if i == 5:\n        break\ni"
         result = await async_evaluate(code, {"range": range}, variables={})
@@ -1017,6 +1043,16 @@ texec(tcompile("1 + 1", "no filename", "exec"))
     async def test_can_import_os_if_all_imports_authorized(self):
         dangerous_code = "import os; os.listdir('./')"
         await async_evaluate(dangerous_code, authorized_imports=["*"])
+
+    @pytest.mark.asyncio
+    async def test_comment(self):
+        code = dedent(
+            """\
+            # Empty line comment
+            1 + 1 # End of line comment
+            """)
+        result = await async_evaluate(code, {}, {})
+        assert result == 2
 
 
 @pytest.mark.asyncio

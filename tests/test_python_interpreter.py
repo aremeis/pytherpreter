@@ -298,6 +298,15 @@ print(check_digits)
         result = evaluate(code, {"range": range}, variables={})
         assert result == [0, 1, 2]
 
+    def test_generatorcomp(self):
+        code = "x = next(2 / i for i in reversed(range(3)))"
+        result = evaluate(code, {"range": range, "next": next, "reversed": reversed}, variables={})
+        assert result == 1
+
+        code = "x = next(a for a, b in [(1, 2), (3, 4)] if b > 2)"
+        result = evaluate(code, {"next": next}, variables={})
+        assert result == 3
+
     def test_break_continue(self):
         code = "for i in range(10):\n    if i == 5:\n        break\ni"
         result = evaluate(code, {"range": range}, variables={})
@@ -949,6 +958,15 @@ texec(tcompile("1 + 1", "no filename", "exec"))
     def test_can_import_os_if_all_imports_authorized(self):
         dangerous_code = "import os; os.listdir('./')"
         evaluate(dangerous_code, authorized_imports=["*"])
+
+    def test_comment(self):
+        code = dedent(
+            """\
+            # Empty line comment
+            1 + 1 # End of line comment
+            """)
+        result = evaluate(code, {}, {})
+        assert result == 2
 
 
 @pytest.mark.parametrize(
