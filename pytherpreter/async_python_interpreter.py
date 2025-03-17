@@ -354,7 +354,7 @@ async def evaluate_assign(
     if len(assign.targets) == 1:
         target = assign.targets[0]
         await set_value(target, result, state, static_tools, custom_tools, authorized_imports)
-    else:
+    elif isinstance(assign.targets, tuple):
         if len(assign.targets) != len(result):
             raise InterpreterError(f"Assign failed: expected {len(result)} values but got {len(assign.targets)}.")
         expanded_values = []
@@ -365,6 +365,9 @@ async def evaluate_assign(
                 expanded_values.append(result)
         for tgt, val in zip(assign.targets, expanded_values):
             await set_value(tgt, val, state, static_tools, custom_tools, authorized_imports)
+    else:
+        for target in assign.targets:
+            await set_value(target, result, state, static_tools, custom_tools, authorized_imports)
     return result
 
 

@@ -78,6 +78,12 @@ class TestAsyncPythonInterpreter():
         result = await async_evaluate(code, {}, variables={})
         assert result is None
 
+        state = {}
+        code = "x = y = 1"
+        result = await async_evaluate(code, {}, variables=state)
+        assert result == 1
+        self.assertDictEqualNoPrint(state, {"x": 1, "y": 1, "_operations_count": 2})
+
     @pytest.mark.asyncio
     async def test_assignment_cannot_overwrite_tool(self):
         code = "print = '3'"

@@ -68,6 +68,12 @@ class PythonInterpreterTester(unittest.TestCase):
         # evaluate returns the value of the last assignment.
         assert result is None
 
+        state = {}
+        code = "x = y = 1"
+        result = evaluate(code, {}, variables=state)
+        assert result == 1
+        self.assertDictEqualNoPrint(state, {"x": 1, "y": 1, "_operations_count": 2})
+
     def test_assignment_cannot_overwrite_tool(self):
         code = "print = '3'"
         with pytest.raises(InterpreterError) as e:
