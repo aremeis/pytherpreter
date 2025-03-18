@@ -313,6 +313,11 @@ print(check_digits)
         result = evaluate(code, {"next": next}, variables={})
         assert result == 3
 
+        data = [{"a": 1, "b": [1, 2, 3]}, {"a": 3, "b": [4, 5, 6]}]
+        code = "sum(x for element in data for x in element['b'])"
+        result = evaluate(code, {"sum": sum}, variables={"data": data})
+        assert result == 21
+
     def test_break_continue(self):
         code = "for i in range(10):\n    if i == 5:\n        break\ni"
         result = evaluate(code, {"range": range}, variables={})

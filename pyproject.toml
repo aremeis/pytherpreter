@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytherpreter"
-version = "0.2.2"
+version = "0.2.3"
 authors = [
     {name = "Are Meisfjord"},
     {name = "The HuggingFace Inc. team"}

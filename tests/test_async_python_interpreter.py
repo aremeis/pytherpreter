@@ -343,6 +343,11 @@ print(check_digits)
         result = await async_evaluate(code, {"next": next}, variables={})
         assert result == 3
 
+        data = [{"a": 1, "b": [1, 2, 3]}, {"a": 3, "b": [4, 5, 6]}]
+        code = "sum(x for element in data for x in element['b'])"
+        result = await async_evaluate(code, {"sum": sum}, variables={"data": data})
+        assert result == 21
+
     @pytest.mark.asyncio
     async def test_async_for(self):
         # Test async generator expression

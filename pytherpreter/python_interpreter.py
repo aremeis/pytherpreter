@@ -733,52 +733,53 @@ def evaluate_generatorexp(
     custom_tools: Dict[str, Callable],
     authorized_imports: List[str],
 ) -> Any:
-    elt = expression.elt
     generators = expression.generators
     
+    # Stack-based approach rather than recursion
     def generator():
-        # Create a new state for the generator to avoid variable leakage
+        # Make a copy of the state to avoid modifying the original
         gen_state = state.copy()
         
-        # Evaluate the iterables first
-        iterables = []
-        for gen in generators:
-            iterable = evaluate_ast(gen.iter, gen_state, static_tools, custom_tools, authorized_imports)
-            iterables.append(iter(iterable))
-        
-        # Helper function to recursively handle nested generators
-        def generate_values(depth=0):
-            if depth == len(generators):
-                # At max depth, yield the element
-                yield evaluate_ast(elt, gen_state, static_tools, custom_tools, authorized_imports)
+        # Helper function to process a single level of generators
+        def process_generators(gen_idx=0):
+            if gen_idx >= len(generators):
+                # Base case: yield the result when we've processed all generators
+                yield evaluate_ast(expression.elt, gen_state, static_tools, custom_tools, authorized_imports)
                 return
+                
+            # Get the current generator
+            gen = generators[gen_idx]
             
-            gen = generators[depth]
-            iterator = iterables[depth]
+            # Evaluate the iterable for this generator
+            iterable = evaluate_ast(gen.iter, gen_state, static_tools, custom_tools, authorized_imports)
             
-            # Handle 'if' conditions in the generator
-            for value in iterator:
-                # Use set_value to handle all kinds of targets, including tuple unpacking
+            # Process each item in the iterable
+            for value in iterable:
+                # Set the value in our generator state
                 set_value(
                     gen.target,
                     value,
                     gen_state,
                     static_tools,
-                    custom_tools, 
-                    authorized_imports
+                    custom_tools,
+                    authorized_imports,
                 )
                 
-                # Check if conditions
-                skip = False
-                for if_clause in gen.ifs:
-                    if not evaluate_ast(if_clause, gen_state, static_tools, custom_tools, authorized_imports):
-                        skip = True
+                # Check all ifs conditions
+                all_conditions_met = True
+                for condition in gen.ifs:
+                    if not evaluate_ast(condition, gen_state, static_tools, custom_tools, authorized_imports):
+                        all_conditions_met = False
                         break
+                        
+                if not all_conditions_met:
+                    continue
+                    
+                # Process the next level of generators
+                yield from process_generators(gen_idx + 1)
                 
-                if not skip:
-                    yield from generate_values(depth + 1)
-        
-        yield from generate_values()
+        # Start processing from the first generator
+        yield from process_generators()
     
     return generator()
 
